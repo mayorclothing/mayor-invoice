@@ -60,7 +60,19 @@ app.post('/generate', (req, res) => {
     doc.font('Times-Bold').text('Shipping / Billing Address:', margin, ly, { width: leftW });
     ly += 13;
 
-    const addrLines = address.split(',').map(s => s.trim()).filter(Boolean);
+      // Split on newlines or commas; merge state/zip onto previous line
+      const rawAddr = address.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+      const addrLines = [];
+      for (let i = 0; i < rawAddr.length; i++) {
+        const ln = rawAddr[i];
+        if (addrLines.length > 0 && /^[A-Z]{2}(\s+\d{5})?$/.test(ln)) {
+          addrLines[addrLines.length - 1] += ', ' + ln;
+        } else if (addrLines.length > 0 && /^\d{5}(-\d{4})?$/.test(ln)) {
+          addrLines[addrLines.length - 1] += ' ' + ln;
+        } else {
+          addrLines.push(ln);
+        }
+      }
     addrLines.forEach(line => {
       doc.font('Times-Roman').fontSize(9).text(line, margin, ly, { width: leftW });
       ly += 12;
@@ -115,7 +127,7 @@ app.post('/generate', (req, res) => {
     // Line items
     line_items.forEach((item, i) => {
       // Normalize description - replace \n with actual newlines, keep spaces intact
-      const descText = (item.description || '').replace(/\\n/g, '\n');
+      const descText = (item.description || '').replace(/\\n/g, '\n').replace(/ \/ /g, '\n');
       const descH = doc.fontSize(8.5).heightOfString(descText, { width: dW - 8, lineGap: 1.5 });
       const rowH = Math.max(descH + 14, 26);
 
