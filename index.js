@@ -140,8 +140,34 @@ app.post('/generate', (req, res) => {
          .text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url || '#' });
       doc.text(descText, cD + 3, ry + 7, { width: dW - 6, lineGap: 1.5 });
       doc.text(String(item.quantity || ''), cQ,  ry + 7, { width: qW,     align: 'right' });
-      doc.text(item.price  ? '$' + Number(item.price).toFixed(2)  : '', cPr, ry + 7, { width: prW,    align: 'right' });
-      doc.text(item.amount ? '$' + Number(item.amount).toFixed(2) : '', cA,  ry + 7, { width: aW - 2, align: 'right' });
+      // Price column: show orig_price struck through if present, then actual price
+      if (item.orig_price && Number(item.orig_price) > 0) {
+        const origText = '$' + Number(item.orig_price).toFixed(2);
+        const actText  = '$' + Number(item.price).toFixed(2);
+        const origW = doc.widthOfString(origText);
+        const actW  = doc.widthOfString(actText);
+        const totalW = origW + 4 + actW;
+        const startX = cPr + prW - totalW;
+        doc.text(origText, startX, ry + 7);
+        doc.moveTo(startX, ry + 13).lineTo(startX + origW, ry + 13).lineWidth(0.7).stroke('#1a1a18');
+        doc.text(actText, startX + origW + 4, ry + 7);
+      } else {
+        doc.text(item.price ? '$' + Number(item.price).toFixed(2) : '', cPr, ry + 7, { width: prW, align: 'right' });
+      }
+      const amtText = item.amount ? '$' + Number(item.amount).toFixed(2) : (Number(item.price) === 0 ? '$0.00' : '');
+      doc.text(amtText, cA, ry + 7, { width: aW - 2, align: 'right' });
+      // Strike through price and amount if price is $0
+      if (Number(item.price) === 0 && amtText) {
+        const tw = doc.widthOfString(amtText);
+        const tx = cA + aW - 2 - tw;
+        doc.moveTo(tx, ry + 13).lineTo(tx + tw, ry + 13).lineWidth(0.7).stroke('#1a1a18');
+      }
+      if (Number(item.price) === 0) {
+        const prText = '$' + Number(item.price).toFixed(2);
+        const ptw = doc.widthOfString(prText);
+        const ptx = cPr + prW - ptw;
+        doc.moveTo(ptx, ry + 13).lineTo(ptx + ptw, ry + 13).lineWidth(0.7).stroke('#1a1a18');
+      }
 
       ry += rowH;
     });
