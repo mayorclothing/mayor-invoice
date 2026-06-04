@@ -32,9 +32,9 @@ app.post('/generate', (req, res) => {
     doc.fontSize(16).font('Times-Roman')
        .text('Invoice', margin, margin, { align: 'center', width: contentW, characterSpacing: 3 });
 
-    // Logo - no background box, just image on white page
+    // Logo - no border, just image
     try {
-      doc.image(LOGO_PATH, pageW - margin - 98, margin - 8, { width: 90 });
+      doc.image(LOGO_PATH, pageW - margin - 95, margin - 6, { width: 88 });
     } catch(e) {}
 
     // Horizontal rule
@@ -42,8 +42,8 @@ app.post('/generate', (req, res) => {
 
     // ── LAYOUT ──
     const bodyY = margin + 42;
-    const leftW = 190;
-    const rightX = margin + leftW + 22;
+    const leftW = 205;   // wider left column so order number doesn't clip
+    const rightX = margin + leftW + 16;
     const rightW = pageW - margin - rightX;
 
     // ── LEFT COLUMN ──
@@ -51,7 +51,7 @@ app.post('/generate', (req, res) => {
 
     doc.fontSize(9.5).font('Times-Bold').text('Order Number', margin, ly, { continued: true })
        .font('Times-Roman').text(': ' + order_number, { width: leftW });
-    ly += doc.heightOfString('Order Number: ' + order_number, { width: leftW }) + 5;
+    ly += doc.heightOfString('Order Number: ' + order_number, { width: leftW }) + 6;
 
     doc.font('Times-Bold').text('Club', margin, ly, { continued: true })
        .font('Times-Roman').text(': ' + club, { width: leftW });
@@ -88,10 +88,9 @@ app.post('/generate', (req, res) => {
     // ── RIGHT COLUMN — TABLE ──
     let ry = bodyY;
 
-    // Column setup - give description more room
     const pW = 78;
     const qW = 44;
-    const prW = 42;
+    const prW = 44;
     const aW = 52;
     const dW = rightW - pW - qW - prW - aW;
 
@@ -107,14 +106,15 @@ app.post('/generate', (req, res) => {
     doc.fillColor('white').fontSize(8.5).font('Times-Bold');
     doc.text('Product',     cP + 3,  ry + 5, { width: pW - 3 });
     doc.text('Description', cD + 3,  ry + 5, { width: dW - 3 });
-    doc.text('Quantity',    cQ,       ry + 5, { width: qW,  align: 'right' });
-    doc.text('Price',       cPr,      ry + 5, { width: prW, align: 'right' });
-    doc.text('Amount',      cA,       ry + 5, { width: aW - 2, align: 'right' });
+    doc.text('Quantity',    cQ,       ry + 5, { width: qW,      align: 'right' });
+    doc.text('Price',       cPr,      ry + 5, { width: prW,     align: 'right' });
+    doc.text('Amount',      cA,       ry + 5, { width: aW - 2,  align: 'right' });
     doc.fillColor('#1a1a18');
     ry += hH;
 
     // Line items
     line_items.forEach((item, i) => {
+      // Normalize description - replace \n with actual newlines, keep spaces intact
       const descText = (item.description || '').replace(/\\n/g, '\n');
       const descH = doc.fontSize(8.5).heightOfString(descText, { width: dW - 8, lineGap: 1.5 });
       const rowH = Math.max(descH + 14, 26);
@@ -127,32 +127,35 @@ app.post('/generate', (req, res) => {
       doc.fontSize(8.5).font('Times-Roman').fillColor('#1a1a18')
          .text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url || '#' });
       doc.text(descText, cD + 3, ry + 7, { width: dW - 6, lineGap: 1.5 });
-      doc.text(String(item.quantity || ''), cQ, ry + 7, { width: qW, align: 'right' });
-      doc.text(item.price ? '$' + Number(item.price).toFixed(2) : '', cPr, ry + 7, { width: prW, align: 'right' });
-      doc.text(item.amount ? '$' + Number(item.amount).toFixed(2) : '', cA, ry + 7, { width: aW - 2, align: 'right' });
+      doc.text(String(item.quantity || ''), cQ,  ry + 7, { width: qW,     align: 'right' });
+      doc.text(item.price  ? '$' + Number(item.price).toFixed(2)  : '', cPr, ry + 7, { width: prW,    align: 'right' });
+      doc.text(item.amount ? '$' + Number(item.amount).toFixed(2) : '', cA,  ry + 7, { width: aW - 2, align: 'right' });
 
       ry += rowH;
     });
 
-    // Bottom rows helper
-    const drawRow = (label, value, strike = false, bold = false) => {
-      doc.rect(rightX, ry, rightW, 17).lineWidth(0.4).stroke('#cccccc');
-      doc.fontSize(8.5).font(bold ? 'Times-Bold' : 'Times-Bold').fillColor('#1a1a18')
+    // Helper: draw a bottom row with optional strikethrough centered on text
+    const drawRow = (label, value, strike = false) => {
+      const rH = 17;
+      doc.rect(rightX, ry, rightW, rH).lineWidth(0.4).stroke('#cccccc');
+      doc.fontSize(8.5).font('Times-Bold').fillColor('#1a1a18')
          .text(label, cPr - 55, ry + 5, { width: 55 + prW, align: 'right' });
       doc.font('Times-Roman').text(value, cA, ry + 5, { width: aW - 2, align: 'right' });
       if (strike) {
         const tw = doc.widthOfString(value);
         const tx = cA + aW - 2 - tw;
-        doc.moveTo(tx, ry + 11).lineTo(tx + tw, ry + 11).lineWidth(0.7).stroke('#1a1a18');
+        const midY = ry + rH / 2;  // true vertical center of row
+        doc.moveTo(tx, midY).lineTo(tx + tw, midY).lineWidth(0.8).stroke('#1a1a18');
       }
-      ry += 17;
+      ry += rH;
     };
 
-    // Subtotal
+    // Subtotal row — qty total on left side of subtotal label
     const qtyTotal = line_items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
     doc.rect(rightX, ry, rightW, 17).lineWidth(0.4).stroke('#cccccc');
     doc.fontSize(8.5).font('Times-Bold').fillColor('#1a1a18')
-       .text('Subtotal', cQ - 50, ry + 5, { width: 50 + qW, align: 'right' });
+       // "Subtotal" label moved left to sit under Description col
+       .text('Subtotal', cD, ry + 5, { width: dW, align: 'right' });
     doc.font('Times-Roman')
        .text(String(qtyTotal), cQ, ry + 5, { width: qW, align: 'right' })
        .text('$' + Number(subtotal).toFixed(2), cA, ry + 5, { width: aW - 2, align: 'right' });
@@ -162,8 +165,9 @@ app.post('/generate', (req, res) => {
     if (art_setup)  drawRow('Art Setup',  '$' + Number(art_setup).toFixed(2),  true);
     drawRow('Shipping', '$' + Number(shipping).toFixed(0));
 
-    // Total row
-    doc.rect(rightX, ry, rightW, 18).lineWidth(0.4).stroke('#cccccc');
+    // Total
+    const totH = 18;
+    doc.rect(rightX, ry, rightW, totH).lineWidth(0.4).stroke('#cccccc');
     doc.fontSize(9).font('Times-Bold').fillColor('#1a1a18')
        .text('Total', cPr - 55, ry + 5, { width: 55 + prW, align: 'right' })
        .text('$' + Number(total).toFixed(2), cA, ry + 5, { width: aW - 2, align: 'right' });
