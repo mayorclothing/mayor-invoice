@@ -13,7 +13,7 @@ app.post('/generate', (req, res) => {
     const data = req.body;
     const {
       order_number = '', club = '', address = '', ship_date = '',
-      payment_link = '', w9_link = 'https://www.mayorclothing.com/w9',
+      payment_link = '', w9_link = 'https://drive.google.com/file/d/1iZD_sP2WQbfPrXkHIcPqf7XawDMP2Zi1/view',
       line_items = [], subtotal = 0, embroidery, art_setup, strike_embroidery = true, strike_art = true,
       shipping = 0, total = 0
     } = data;
