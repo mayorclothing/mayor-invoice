@@ -14,7 +14,7 @@ app.post('/generate', (req, res) => {
     const {
       order_number = '', club = '', address = '', ship_date = '',
       payment_link = '', w9_link = 'https://www.mayorclothing.com/w9',
-      line_items = [], subtotal = 0, embroidery, art_setup,
+      line_items = [], subtotal = 0, embroidery, art_setup, strike_embroidery = true, strike_art = true,
       shipping = 0, total = 0
     } = data;
 
@@ -161,8 +161,8 @@ app.post('/generate', (req, res) => {
        .text('$' + Number(subtotal).toFixed(2), cA, ry + 5, { width: aW - 2, align: 'right' });
     ry += 17;
 
-    if (embroidery) drawRow('Embroidery', '$' + Number(embroidery).toFixed(2), true);
-    if (art_setup)  drawRow('Art Setup',  '$' + Number(art_setup).toFixed(2),  true);
+    if (embroidery) drawRow('Embroidery', '$' + Number(embroidery).toFixed(2), strike_embroidery);
+    if (art_setup)  drawRow('Art Setup',  '$' + Number(art_setup).toFixed(2),  strike_art);
     drawRow('Shipping', '$' + Number(shipping).toFixed(0));
 
     // Total
