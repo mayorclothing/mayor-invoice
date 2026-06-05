@@ -63,18 +63,8 @@ app.post('/generate', (req, res) => {
     ly += 13;
 
       // Split on newlines or commas; merge state/zip onto previous line
-      const rawAddr = address.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
-      const addrLines = [];
-      for (let i = 0; i < rawAddr.length; i++) {
-        const ln = rawAddr[i];
-        if (addrLines.length > 0 && /^[A-Z]{2}(\s+\d{5})?$/.test(ln)) {
-          addrLines[addrLines.length - 1] += ', ' + ln;
-        } else if (addrLines.length > 0 && /^\d{5}(-\d{4})?$/.test(ln)) {
-          addrLines[addrLines.length - 1] += ' ' + ln;
-        } else {
-          addrLines.push(ln);
-        }
-      }
+      // Split address on newlines only — launcher handles the formatting
+      const addrLines = address.split(/\n/).map(s => s.trim()).filter(Boolean);
     addrLines.forEach(line => {
       doc.font('Times-Roman').fontSize(9).text(line, margin, ly, { width: leftW });
       ly += 12;
