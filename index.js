@@ -29,8 +29,19 @@ app.post('/generate', (req, res) => {
     const contentW = pageW - margin * 2;
 
     // ── HEADER ──
-    doc.fontSize(16).font('Times-Roman')
-       .text('Invoice', margin, margin, { align: 'center', width: contentW, characterSpacing: 3 });
+    // Simulate small caps for "Invoice" - capital I full size, rest as uppercase smaller
+    const invoiceText = 'INVOICE';
+    const capSize = 16;
+    const smallCapSize = 11.5;
+    // Calculate total width to center it
+    doc.fontSize(capSize).font('Times-Roman');
+    const capW = doc.widthOfString('I', { characterSpacing: 2.5 });
+    doc.fontSize(smallCapSize);
+    const restW = doc.widthOfString('NVOICE', { characterSpacing: 2.5 });
+    const totalW = capW + restW;
+    const startX = margin + (contentW - totalW) / 2;
+    doc.fontSize(capSize).font('Times-Roman').text('I', startX, margin, { characterSpacing: 2.5, lineBreak: false });
+    doc.fontSize(smallCapSize).text('NVOICE', startX + capW, margin + 1.5, { characterSpacing: 2.5, lineBreak: false });
 
     // Logo - no border, just image
     try {
