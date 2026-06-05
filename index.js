@@ -29,7 +29,7 @@ app.post('/generate', (req, res) => {
     const contentW = pageW - margin * 2;
 
     // ── HEADER ──
-    doc.fontSize(16).font('Times-Bold')
+    doc.fontSize(16).font('Times-Roman')
        .text('Invoice', margin, margin, { align: 'center', width: contentW, characterSpacing: 3 });
 
     // Logo - no border, just image
