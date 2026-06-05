@@ -161,21 +161,33 @@ app.post('/generate', (req, res) => {
       } else {
         doc.text(item.price ? '$' + Number(item.price).toFixed(2) : '', cPr, ry + 7, { width: prW, align: 'right' });
       }
-      const amtText = item.amount ? '$' + Number(item.amount).toFixed(2) : (Number(item.price) === 0 ? '$0.00' : '');
-      doc.text(amtText, cA, ry + 7, { width: aW - 2, align: 'right' });
-      // Strike through price and amount if price is $0
-      if (Number(item.price) === 0 && amtText) {
-        const tw = doc.widthOfString(amtText);
-        const tx = cA + aW - 2 - tw;
-        const zMid = ry + 7 + 8.5 * 0.35;
-        doc.moveTo(tx, zMid).lineTo(tx + tw, zMid).lineWidth(0.8).stroke('#1a1a18');
-      }
-      if (Number(item.price) === 0) {
-        const prText = '$0.00';
-        const ptw = doc.widthOfString(prText);
-        const ptx = cPr + prW - ptw;
-        const zMid = ry + 7 + 8.5 * 0.35;
-        doc.moveTo(ptx, zMid).lineTo(ptx + ptw, zMid).lineWidth(0.8).stroke('#1a1a18');
+      // Amount column: if orig_price exists, show struck-through orig amount above actual amount
+      if (item.orig_price && Number(item.orig_price) > 0) {
+        const origAmt = '$' + (Number(item.orig_price) * Number(item.quantity)).toFixed(2);
+        const actAmt  = '$' + Number(item.amount).toFixed(2);
+        doc.text(origAmt, cA, ry + 5, { width: aW - 2, align: 'right' });
+        const origAmtW = doc.widthOfString(origAmt);
+        const origAmtX = cA + aW - 2 - origAmtW;
+        const midY = ry + 5 + 8.5 * 0.35;
+        doc.moveTo(origAmtX, midY).lineTo(origAmtX + origAmtW, midY).lineWidth(0.8).stroke('#1a1a18');
+        doc.text(actAmt, cA, ry + 18, { width: aW - 2, align: 'right' });
+      } else {
+        const amtText = item.amount ? '$' + Number(item.amount).toFixed(2) : (Number(item.price) === 0 ? '$0.00' : '');
+        doc.text(amtText, cA, ry + 7, { width: aW - 2, align: 'right' });
+        // Strike through if price is $0
+        if (Number(item.price) === 0 && amtText) {
+          const tw = doc.widthOfString(amtText);
+          const tx = cA + aW - 2 - tw;
+          const zMid = ry + 7 + 8.5 * 0.35;
+          doc.moveTo(tx, zMid).lineTo(tx + tw, zMid).lineWidth(0.8).stroke('#1a1a18');
+        }
+        if (Number(item.price) === 0) {
+          const prText = '$0.00';
+          const ptw = doc.widthOfString(prText);
+          const ptx = cPr + prW - ptw;
+          const zMid = ry + 7 + 8.5 * 0.35;
+          doc.moveTo(ptx, zMid).lineTo(ptx + ptw, zMid).lineWidth(0.8).stroke('#1a1a18');
+        }
       }
 
       ry += rowH;
