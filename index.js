@@ -149,13 +149,15 @@ app.post('/generate', (req, res) => {
       if (item.orig_price && Number(item.orig_price) > 0) {
         const origText = '$' + Number(item.orig_price).toFixed(2);
         const actText  = '$' + Number(item.price).toFixed(2);
-        // Draw original price struck through
+        // Draw original price
         doc.text(origText, cPr, ry + 5, { width: prW, align: 'right' });
         const origW = doc.widthOfString(origText);
         const origX = cPr + prW - origW;
-        doc.moveTo(origX, ry + 11).lineTo(origX + origW, ry + 11).lineWidth(0.7).stroke('#1a1a18');
+        // Strikethrough at true midpoint of font (8.5pt ~= 6px cap height, mid at ~8px from top of text)
+        const midY = ry + 5 + 8.5 * 0.35;
+        doc.moveTo(origX, midY).lineTo(origX + origW, midY).lineWidth(0.8).stroke('#1a1a18');
         // Draw actual price below
-        doc.text(actText, cPr, ry + 17, { width: prW, align: 'right' });
+        doc.text(actText, cPr, ry + 18, { width: prW, align: 'right' });
       } else {
         doc.text(item.price ? '$' + Number(item.price).toFixed(2) : '', cPr, ry + 7, { width: prW, align: 'right' });
       }
@@ -165,13 +167,15 @@ app.post('/generate', (req, res) => {
       if (Number(item.price) === 0 && amtText) {
         const tw = doc.widthOfString(amtText);
         const tx = cA + aW - 2 - tw;
-        doc.moveTo(tx, ry + 13).lineTo(tx + tw, ry + 13).lineWidth(0.7).stroke('#1a1a18');
+        const zMid = ry + 7 + 8.5 * 0.35;
+        doc.moveTo(tx, zMid).lineTo(tx + tw, zMid).lineWidth(0.8).stroke('#1a1a18');
       }
       if (Number(item.price) === 0) {
-        const prText = '$' + Number(item.price).toFixed(2);
+        const prText = '$0.00';
         const ptw = doc.widthOfString(prText);
         const ptx = cPr + prW - ptw;
-        doc.moveTo(ptx, ry + 13).lineTo(ptx + ptw, ry + 13).lineWidth(0.7).stroke('#1a1a18');
+        const zMid = ry + 7 + 8.5 * 0.35;
+        doc.moveTo(ptx, zMid).lineTo(ptx + ptw, zMid).lineWidth(0.8).stroke('#1a1a18');
       }
 
       ry += rowH;
