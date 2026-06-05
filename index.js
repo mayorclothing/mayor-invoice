@@ -53,7 +53,9 @@ app.post('/generate', (req, res) => {
        .font('Times-Roman').text(': ' + order_number, { width: leftW });
     ly += doc.heightOfString('Order Number: ' + order_number, { width: leftW }) + 6;
 
-    doc.font('Times-Bold').text('Club', margin, ly, { continued: true })
+    const isClub = /club/i.test(club);
+    const clubLabel = isClub ? 'Club' : 'Client';
+    doc.font('Times-Bold').text(clubLabel, margin, ly, { continued: true })
        .font('Times-Roman').text(': ' + club, { width: leftW });
     ly += doc.heightOfString('Club: ' + club, { width: leftW }) + 10;
 
@@ -86,7 +88,9 @@ app.post('/generate', (req, res) => {
     doc.font('Times-Bold').text('Payment Terms:', margin, ly, { width: leftW });
     ly += 13;
 
-    const terms = 'Due on receipt. Based on our custom model, garments are produced specially for each club. Once clubs approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. ';
+    const terms = isClub
+      ? 'Due on receipt. Based on our custom model, garments are produced specially for each club. Once clubs approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. '
+      : 'Due on receipt. Based on our custom model, garments are produced specially for each client. Once clients approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. ';
     doc.fontSize(8.5).font('Times-Roman').text(terms, margin, ly, { width: leftW, continued: true })
        .text('Here', { continued: true, underline: true, link: w9_link })
        .text(' is our W-9.', { underline: false });
