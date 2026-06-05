@@ -133,7 +133,8 @@ app.post('/generate', (req, res) => {
       // Normalize description - replace \n with actual newlines, keep spaces intact
       const descText = (item.description || '').replace(/\\n/g, '\n').replace(/ \/ /g, '\n');
       const descH = doc.fontSize(8.5).heightOfString(descText, { width: dW - 8, lineGap: 1.5 });
-      const rowH = Math.max(descH + 14, 26);
+      const hasDualPrice = item.orig_price && Number(item.orig_price) > 0;
+      const rowH = Math.max(descH + 14, hasDualPrice ? 40 : 26);
 
       if (i % 2 === 1) {
         doc.rect(rightX, ry, rightW, rowH).fill('#f9f9f8').fillColor('#1a1a18');
@@ -144,17 +145,17 @@ app.post('/generate', (req, res) => {
          .text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url || '#' });
       doc.text(descText, cD + 3, ry + 7, { width: dW - 6, lineGap: 1.5 });
       doc.text(String(item.quantity || ''), cQ,  ry + 7, { width: qW,     align: 'right' });
-      // Price column: show orig_price struck through if present, then actual price
+      // Price column: show orig_price struck through above actual price (stacked)
       if (item.orig_price && Number(item.orig_price) > 0) {
         const origText = '$' + Number(item.orig_price).toFixed(2);
         const actText  = '$' + Number(item.price).toFixed(2);
+        // Draw original price struck through
+        doc.text(origText, cPr, ry + 5, { width: prW, align: 'right' });
         const origW = doc.widthOfString(origText);
-        const actW  = doc.widthOfString(actText);
-        const totalW = origW + 4 + actW;
-        const startX = cPr + prW - totalW;
-        doc.text(origText, startX, ry + 7);
-        doc.moveTo(startX, ry + 13).lineTo(startX + origW, ry + 13).lineWidth(0.7).stroke('#1a1a18');
-        doc.text(actText, startX + origW + 4, ry + 7);
+        const origX = cPr + prW - origW;
+        doc.moveTo(origX, ry + 11).lineTo(origX + origW, ry + 11).lineWidth(0.7).stroke('#1a1a18');
+        // Draw actual price below
+        doc.text(actText, cPr, ry + 17, { width: prW, align: 'right' });
       } else {
         doc.text(item.price ? '$' + Number(item.price).toFixed(2) : '', cPr, ry + 7, { width: prW, align: 'right' });
       }
