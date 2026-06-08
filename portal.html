@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mayor — My Orders</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Times New Roman', Times, serif; background: #f5f5f4; color: #1a1a18; min-height: 100vh; }
+  
+  /* NAV */
+  nav { background: white; border-bottom: 1px solid #e5e5e3; padding: 0 2rem; height: 60px; display: flex; align-items: center; justify-content: space-between; }
+  .nav-logo { font-size: 22px; font-style: italic; letter-spacing: 0.02em; }
+  .nav-right { font-size: 13px; color: #888; }
+  .nav-right a { color: #1a1a18; text-decoration: none; }
+  .nav-right a:hover { text-decoration: underline; }
+
+  /* LAYOUT */
+  .page { display: none; }
+  .page.active { display: block; }
+  .container { max-width: 680px; margin: 0 auto; padding: 2.5rem 1rem; }
+  .container-wide { max-width: 900px; margin: 0 auto; padding: 2.5rem 1rem; }
+
+  /* CARDS */
+  .card { background: white; border: 1px solid #e5e5e3; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+
+  /* TYPOGRAPHY */
+  h1 { font-size: 22px; font-weight: 400; margin-bottom: 0.5rem; }
+  h2 { font-size: 17px; font-weight: 600; margin-bottom: 1rem; }
+  .subtitle { font-size: 14px; color: #888; margin-bottom: 1.5rem; }
+  .section-label { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+
+  /* FORMS */
+  .field { margin-bottom: 14px; }
+  label { font-size: 13px; color: #666; display: block; margin-bottom: 5px; }
+  input, select, textarea { width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; background: white; color: #1a1a18; }
+  input:focus, select:focus { outline: 2px solid #1a1a18; outline-offset: 1px; }
+  .btn { display: block; width: 100%; padding: 11px; font-size: 14px; font-family: inherit; border: none; border-radius: 8px; background: #1a1a18; color: white; cursor: pointer; text-align: center; }
+  .btn:hover { background: #333; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn-outline { background: white; color: #1a1a18; border: 1px solid #ccc; }
+  .btn-outline:hover { background: #f5f5f4; }
+  .btn-sm { display: inline-block; width: auto; padding: 7px 14px; font-size: 13px; }
+
+  /* STATUS BADGES */
+  .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+  .badge-pending  { background: #fef3c7; color: #92400e; }
+  .badge-shipped  { background: #dbeafe; color: #1e40af; }
+  .badge-delivered{ background: #d1fae5; color: #065f46; }
+
+  /* ORDER LIST */
+  .order-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0ee; cursor: pointer; }
+  .order-row:last-child { border-bottom: none; }
+  .order-row:hover { background: #fafaf9; margin: 0 -1.5rem; padding: 14px 1.5rem; border-radius: 8px; }
+  .order-title { font-size: 14px; font-weight: 500; }
+  .order-meta { font-size: 12px; color: #888; margin-top: 3px; }
+  .order-right { text-align: right; }
+  .order-amount { font-size: 14px; font-weight: 500; }
+
+  /* ORDER DETAIL */
+  .detail-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f0f0ee; font-size: 13px; }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-key { color: #888; }
+  .detail-val { font-weight: 500; text-align: right; }
+
+  /* ALERTS */
+  .alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+  .alert-error   { background: #fef2f2; color: #dc2626; }
+  .alert-success { background: #f0fdf4; color: #16a34a; }
+  .alert-info    { background: #eff6ff; color: #2563eb; }
+
+  /* DIVIDER */
+  .divider { border: none; border-top: 1px solid #e5e5e3; margin: 1.5rem 0; }
+
+  /* BACK LINK */
+  .back { font-size: 13px; color: #888; cursor: pointer; margin-bottom: 1.5rem; display: inline-block; }
+  .back:hover { color: #1a1a18; }
+
+  /* TRACKING */
+  .tracking-link { color: #185fa5; font-size: 13px; text-decoration: underline; cursor: pointer; }
+
+  /* RADIO GROUP */
+  .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+  .radio-opt { flex: 1; min-width: 120px; }
+  .radio-opt input[type="radio"] { display: none; }
+  .radio-opt label { display: block; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; text-align: center; cursor: pointer; font-size: 13px; }
+  .radio-opt input[type="radio"]:checked + label { border-color: #1a1a18; background: #1a1a18; color: white; }
+
+  /* MODAL OVERLAY */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 12px; padding: 1.5rem; width: 90%; max-width: 440px; }
+  .modal h2 { margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Mayor</div>
+  <div class="nav-right" id="nav-right">
+    <span id="nav-email"></span>
+    <span id="nav-logout" style="display:none;"> · <a href="#" onclick="logout()">Sign out</a></span>
+  </div>
+</nav>
+
+<!-- PAGE: LOGIN -->
+<div class="page active" id="page-login">
+  <div class="container" style="max-width:420px;">
+    <div style="margin-bottom:2rem; margin-top:1rem;">
+      <h1>Sign in to your orders</h1>
+      <p class="subtitle">Enter your email and password to access your order history and invoices.</p>
+    </div>
+    <div class="card">
+      <div id="login-alert"></div>
+      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@yourclub.com" /></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" /></div>
+      <button class="btn" onclick="doLogin()" id="login-btn">Sign in</button>
+      <div style="text-align:center; margin-top:12px; font-size:13px; color:#888;">
+        <a href="#" onclick="showForgot()" style="color:#888;">Forgot password?</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: FORGOT PASSWORD -->
+<div class="page" id="page-forgot">
+  <div class="container" style="max-width:420px;">
+    <span class="back" onclick="showPage('login')">← Back to sign in</span>
+    <h1>Reset your password</h1>
+    <p class="subtitle" style="margin-bottom:1.5rem;">Enter your email and we'll send you a link to reset your password.</p>
+    <div class="card">
+      <div id="forgot-alert"></div>
+      <div class="field"><label>Email</label><input type="email" id="forgot-email" placeholder="you@yourclub.com" /></div>
+      <button class="btn" onclick="doForgot()" id="forgot-btn">Send reset link</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: SET PASSWORD (from email link) -->
+<div class="page" id="page-setpassword">
+  <div class="container" style="max-width:420px;">
+    <h1>Set your password</h1>
+    <p class="subtitle" style="margin-bottom:1.5rem;">Choose a password to access your Mayor orders portal.</p>
+    <div class="card">
+      <div id="setpw-alert"></div>
+      <div class="field"><label>New password</label><input type="password" id="setpw-password" placeholder="At least 8 characters" /></div>
+      <div class="field"><label>Confirm password</label><input type="password" id="setpw-confirm" placeholder="Repeat password" /></div>
+      <button class="btn" onclick="doSetPassword()" id="setpw-btn">Set password</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: ORDERS LIST -->
+<div class="page" id="page-orders">
+  <div class="container-wide">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:1.5rem;">
+      <div>
+        <h1>Your Orders</h1>
+        <p class="subtitle" style="margin:0;" id="orders-club-name"></p>
+      </div>
+    </div>
+    <div class="card" id="orders-list-card">
+      <div id="orders-list"><p style="color:#888; font-size:13px;">Loading your orders…</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: ORDER DETAIL -->
+<div class="page" id="page-detail">
+  <div class="container-wide">
+    <span class="back" onclick="showPage('orders')">← Back to orders</span>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem; flex-wrap:wrap; gap:10px;">
+      <div>
+        <h1 id="detail-order-number"></h1>
+        <p class="subtitle" id="detail-club" style="margin:0;"></p>
+      </div>
+      <span class="badge" id="detail-status-badge"></span>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+
+      <div>
+        <div class="card">
+          <p class="section-label">Order Details</p>
+          <div id="detail-info"></div>
+        </div>
+        <div class="card">
+          <p class="section-label">Shipping</p>
+          <div id="detail-shipping"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <p class="section-label">Invoice</p>
+          <p style="font-size:13px; color:#888; margin-bottom:12px;">Download your invoice PDF.</p>
+          <button class="btn" onclick="downloadInvoice()">Download Invoice PDF</button>
+        </div>
+        <div class="card">
+          <p class="section-label">Reorder</p>
+          <p style="font-size:13px; color:#888; margin-bottom:12px;">Want to place another order? Let us know your preferences and we'll be in touch.</p>
+          <button class="btn btn-outline" onclick="showReorder()">Request Reorder</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- REORDER MODAL -->
+<div class="modal-overlay" id="reorder-modal">
+  <div class="modal">
+    <h2>Request a Reorder</h2>
+    <p style="font-size:13px; color:#888; margin-bottom:1rem;">We'll reach out to confirm details and pricing.</p>
+    <div id="reorder-alert"></div>
+    <div class="field">
+      <label>Print</label>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="reorder-print" id="rp-same" value="Same print" checked><label for="rp-same">Same print</label></div>
+        <div class="radio-opt"><input type="radio" name="reorder-print" id="rp-diff" value="Different print"><label for="rp-diff">Different print</label></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Colors</label>
+      <div class="radio-group">
+        <div class="radio-opt"><input type="radio" name="reorder-colors" id="rc-same" value="Same colors" checked><label for="rc-same">Same colors</label></div>
+        <div class="radio-opt"><input type="radio" name="reorder-colors" id="rc-diff" value="Different colors"><label for="rc-diff">Different colors</label></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Quantity</label>
+      <input type="number" id="reorder-qty" placeholder="e.g. 24" min="1" />
+    </div>
+    <div class="field">
+      <label>Additional notes (optional)</label>
+      <textarea id="reorder-notes" rows="3" placeholder="Any specific requests…"></textarea>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:4px;">
+      <button class="btn btn-outline" onclick="closeReorder()" style="flex:1;">Cancel</button>
+      <button class="btn" onclick="submitReorder()" id="reorder-btn" style="flex:1;">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = ''; // same origin — portal served from Render
+
+let currentUser = null;
+let currentOrders = [];
+let currentOrder = null;
+
+// ── PAGE ROUTING ──
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+}
+
+function showForgot() { showPage('forgot'); }
+
+// ── AUTH ──
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const alert = document.getElementById('login-alert');
+
+  if (!email || !password) { showAlert('login-alert', 'error', 'Please enter your email and password.'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+
+  try {
+    const res = await fetch('/portal/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    currentUser = { email: data.email, club: data.club };
+    document.getElementById('nav-email').textContent = data.email;
+    document.getElementById('nav-logout').style.display = '';
+    loadOrders();
+  } catch(e) {
+    showAlert('login-alert', 'error', e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+}
+
+async function doForgot() {
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) { showAlert('forgot-alert', 'error', 'Please enter your email.'); return; }
+  const btn = document.getElementById('forgot-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const res = await fetch('/portal/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    showAlert('forgot-alert', 'success', 'If an account exists for that email, a reset link has been sent.');
+  } catch(e) {
+    showAlert('forgot-alert', 'error', 'Something went wrong. Please try again.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send reset link';
+  }
+}
+
+async function doSetPassword() {
+  const password = document.getElementById('setpw-password').value;
+  const confirm  = document.getElementById('setpw-confirm').value;
+  if (password.length < 8) { showAlert('setpw-alert', 'error', 'Password must be at least 8 characters.'); return; }
+  if (password !== confirm) { showAlert('setpw-alert', 'error', 'Passwords do not match.'); return; }
+  const btn = document.getElementById('setpw-btn');
+  btn.disabled = true; btn.textContent = 'Setting password…';
+  const token = new URLSearchParams(window.location.search).get('token');
+  try {
+    const res = await fetch('/portal/set-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to set password');
+    showAlert('setpw-alert', 'success', 'Password set! Redirecting to sign in…');
+    setTimeout(() => showPage('login'), 1500);
+  } catch(e) {
+    showAlert('setpw-alert', 'error', e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Set password';
+  }
+}
+
+function logout() {
+  fetch('/portal/logout', { method: 'POST', credentials: 'include' });
+  currentUser = null;
+  document.getElementById('nav-email').textContent = '';
+  document.getElementById('nav-logout').style.display = 'none';
+  showPage('login');
+}
+
+// ── ORDERS ──
+async function loadOrders() {
+  showPage('orders');
+  document.getElementById('orders-club-name').textContent = currentUser.club || '';
+  const list = document.getElementById('orders-list');
+  list.innerHTML = '<p style="color:#888; font-size:13px;">Loading…</p>';
+
+  try {
+    const res = await fetch('/portal/orders', { credentials: 'include' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    currentOrders = data.orders || [];
+    if (!currentOrders.length) {
+      list.innerHTML = '<p style="color:#888; font-size:13px;">No orders found.</p>';
+      return;
+    }
+    list.innerHTML = currentOrders.map((o, i) => `
+      <div class="order-row" onclick="showOrder(${i})">
+        <div>
+          <div class="order-title">${o.order_number}</div>
+          <div class="order-meta">${o.club} · ${o.ship_date}</div>
+        </div>
+        <div class="order-right">
+          <span class="badge badge-${(o.status||'pending').toLowerCase()}">${o.status || 'Pending'}</span>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    list.innerHTML = `<p style="color:#dc2626; font-size:13px;">${e.message}</p>`;
+  }
+}
+
+function showOrder(idx) {
+  currentOrder = currentOrders[idx];
+  const o = currentOrder;
+
+  document.getElementById('detail-order-number').textContent = 'Order: ' + o.order_number;
+  document.getElementById('detail-club').textContent = o.club;
+
+  const statusClass = { pending: 'badge-pending', shipped: 'badge-shipped', delivered: 'badge-delivered' };
+  const badge = document.getElementById('detail-status-badge');
+  badge.textContent = o.status || 'Pending';
+  badge.className = 'badge ' + (statusClass[(o.status||'pending').toLowerCase()] || 'badge-pending');
+
+  document.getElementById('detail-info').innerHTML = `
+    <div class="detail-row"><span class="detail-key">Order #</span><span class="detail-val">${o.order_number}</span></div>
+    <div class="detail-row"><span class="detail-key">Club</span><span class="detail-val">${o.club}</span></div>
+    <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${o.ship_date}</span></div>
+    <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${o.status || 'Pending'}</span></div>`;
+
+  const trackingHTML = o.tracking_number
+    ? `<div class="detail-row"><span class="detail-key">Carrier</span><span class="detail-val">UPS</span></div>
+       <div class="detail-row"><span class="detail-key">Tracking</span><span class="detail-val"><a class="tracking-link" href="https://www.ups.com/track?tracknum=${o.tracking_number}" target="_blank">${o.tracking_number}</a></span></div>`
+    : `<div class="detail-row"><span class="detail-key">Tracking</span><span class="detail-val" style="color:#888;">Not yet available</span></div>`;
+
+  document.getElementById('detail-shipping').innerHTML = trackingHTML;
+  showPage('detail');
+}
+
+async function downloadInvoice() {
+  if (!currentOrder) return;
+  try {
+    const res = await fetch('/portal/invoice/' + encodeURIComponent(currentOrder.order_number), { credentials: 'include' });
+    if (!res.ok) throw new Error('Invoice not available');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Mayor-Invoice-${currentOrder.order_number}.pdf`;
+    a.click();
+  } catch(e) {
+    alert('Could not download invoice: ' + e.message);
+  }
+}
+
+// ── REORDER ──
+function showReorder() { document.getElementById('reorder-modal').classList.add('open'); }
+function closeReorder() { document.getElementById('reorder-modal').classList.remove('open'); }
+
+async function submitReorder() {
+  const print  = document.querySelector('input[name="reorder-print"]:checked').value;
+  const colors = document.querySelector('input[name="reorder-colors"]:checked').value;
+  const qty    = document.getElementById('reorder-qty').value;
+  const notes  = document.getElementById('reorder-notes').value;
+
+  if (!qty) { showAlert('reorder-alert', 'error', 'Please enter a quantity.'); return; }
+
+  const btn = document.getElementById('reorder-btn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  try {
+    const res = await fetch('/portal/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        order_number: currentOrder.order_number,
+        club: currentOrder.club,
+        print, colors, qty, notes
+      })
+    });
+    if (!res.ok) throw new Error('Failed to submit');
+    showAlert('reorder-alert', 'success', 'Request sent! We\'ll be in touch shortly.');
+    setTimeout(closeReorder, 2000);
+  } catch(e) {
+    showAlert('reorder-alert', 'error', e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Submit Request';
+  }
+}
+
+// ── UTILS ──
+function showAlert(id, type, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'alert alert-' + type;
+  el.textContent = msg;
+  el.style.display = '';
+}
+
+// Check for set-password token in URL
+window.addEventListener('load', () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('token') && params.get('action') === 'set-password') {
+    showPage('setpassword');
+  } else if (params.get('token') && params.get('action') === 'reset-password') {
+    showPage('setpassword');
+    document.querySelector('#page-setpassword h1').textContent = 'Reset your password';
+  }
+});
+</script>
+</body>
+</html>
