@@ -26,7 +26,7 @@ async function getOrdersFromSheet(email) {
   const sheets = await getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Sheet1!A:H',
+    range: 'Order Info!A:H',
   });
   const rows = res.data.values || [];
   // Row format: [Order Number, Email, Club, Ship Date, Status, Tracking Number, Date Delivered, Invoice Link]
