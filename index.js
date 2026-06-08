@@ -8,19 +8,9 @@ const { router: portalRouter, sendSetupEmail, getOrdersFromSheet } = require('./
 const app = express();
 
 app.use(cookieParser());
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
 app.use('/portal', portalRouter);
-app.get('/orders', (req, res) => {
-  const filePath = path.join(__dirname, 'portal.html');
-  console.log('Serving portal from:', filePath);
-  res.sendFile(filePath, (err) => {
-    if (err) {
-      console.error('SendFile error:', err.message);
-      res.status(500).send('Portal file not found: ' + filePath);
-    }
-  });
-});
+app.get('/mayor-logo.png', (req, res) => res.sendFile(path.join(__dirname, 'Mayor_Logo_transparent.png')));
+app.get('/orders', (req, res) => res.sendFile(path.join(__dirname, 'portal.html')));
 
 // Google Sheets setup
 const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
@@ -28,17 +18,15 @@ const SHEET_CREDS = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT || '{}');
 
 async function appendOrderToSheet(data) {
   try {
-    if (!SHEET_CREDS.client_email) return;
+    if (!SHEET_CREDS.client_email) return; // skip if no creds configured
     const auth = new google.auth.GoogleAuth({
       credentials: SHEET_CREDS,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
     const sheets = google.sheets({ version: 'v4', auth });
-
-    // Write to Order Info sheet (summary)
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'Order Info!A:H',
+      range: 'Sheet1!A:H',
       valueInputOption: 'USER_ENTERED',
       resource: {
         values: [[
@@ -47,51 +35,20 @@ async function appendOrderToSheet(data) {
           data.club || '',
           data.ship_date || '',
           'Pending',
-          '',
-          '',
-          '',
+          '', // Tracking Number — filled in manually
+          '', // Date Delivered — filled in manually
+          '', // Invoice Link — future use
         ]]
       }
     });
-
-    // Write to Invoices sheet (full data for PDF regeneration)
-    const items = data.line_items || [];
-    const get = (i, key) => items[i] ? (items[i][key] || '') : '';
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: 'Invoices!A:AD',
-      valueInputOption: 'USER_ENTERED',
-      resource: {
-        values: [[
-          data.order_number || '',
-          data.customer_email || '',
-          data.club || '',
-          data.address || '',
-          data.ship_date || '',
-          data.payment_link || '',
-          // Products 1-3
-          get(0,'url'), get(0,'description'), get(0,'quantity'), get(0,'price'),
-          get(1,'url'), get(1,'description'), get(1,'quantity'), get(1,'price'),
-          get(2,'url'), get(2,'description'), get(2,'quantity'), get(2,'price'),
-          // Shipping, subtotal, fees
-          data.shipping || '',
-          data.subtotal || '',
-          data.embroidery || '',
-          data.art_setup || '',
-          // Products 4-5
-          get(3,'url'), get(3,'description'), get(3,'quantity'), get(3,'price'),
-          get(4,'url'), get(4,'description'), get(4,'quantity'), get(4,'price'),
-        ]]
-      }
-    });
-
-    console.log('Order logged to both sheets:', data.order_number);
+    console.log('Order logged to sheet:', data.order_number);
   } catch(e) {
     console.error('Sheet write failed:', e.message);
   }
 }
 
-
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
 
 const LOGO_PATH = __dirname + '/Mayor_Logo_transparent.png';
 
