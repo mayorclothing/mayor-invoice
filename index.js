@@ -41,7 +41,6 @@ async function appendOrderToSheet(data) {
       }
     });
     console.log('Order logged to sheet:', data.order_number);
-  } catch(e) {
     console.error('Sheet write failed:', e.message);
   }
 }
@@ -275,13 +274,6 @@ app.post('/generate', (req, res) => {
 
     // Log order to Google Sheet (non-blocking) — setup email sent manually
     if (!data.skip_logging) appendOrderToSheet(data);
-          await sendSetupEmail(data.customer_email, data.club, token);
-          console.log('Setup email sent to', data.customer_email);
-        }
-      } catch(e) {
-        console.error('Setup email error:', e.message);
-      }
-    });
 
   } catch(e) {
     console.error(e);
