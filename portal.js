@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { google } = require('googleapis');
 const path = require('path');
 const router = express.Router();
+router.use(express.json());
 
 const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
 const JWT_SECRET = process.env.JWT_SECRET || 'mayor-portal-secret-change-in-prod';
