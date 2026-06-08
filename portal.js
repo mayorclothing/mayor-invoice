@@ -29,8 +29,7 @@ async function getOrdersFromSheet(email) {
     range: 'Order Info!A:H',
   });
   const rows = res.data.values || [];
-  // Row format: [Order Number, Email, Club, Ship Date, Status, Tracking Number, Date Delivered, Invoice Link]
-  return rows.slice(1) // skip header
+  return rows.slice(1)
     .filter(r => r[1] && r[1].toLowerCase() === email.toLowerCase())
     .map(r => ({
       order_number:    r[0] || '',
@@ -50,7 +49,6 @@ async function getUserFromSheet(email) {
     range: 'Users!A:C',
   });
   const rows = res.data.values || [];
-  // Users sheet: [Email, PasswordHash, Club]
   const row = rows.find(r => r[0] && r[0].toLowerCase() === email.toLowerCase());
   if (!row) return null;
   return { email: row[0], passwordHash: row[1], club: row[2] };
@@ -58,16 +56,13 @@ async function getUserFromSheet(email) {
 
 async function upsertUser(email, passwordHash, club) {
   const sheets = await getSheets();
-  // Check if user exists
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: 'Users!A:C',
   });
   const rows = res.data.values || [];
   const rowIdx = rows.findIndex(r => r[0] && r[0].toLowerCase() === email.toLowerCase());
-
   if (rowIdx === -1) {
-    // Append new user
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
       range: 'Users!A:C',
@@ -75,15 +70,69 @@ async function upsertUser(email, passwordHash, club) {
       resource: { values: [[email, passwordHash, club]] }
     });
   } else {
-    // Update existing
-    const range = `Users!A${rowIdx + 1}:C${rowIdx + 1}`;
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range,
+      range: `Users!A${rowIdx + 1}:C${rowIdx + 1}`,
       valueInputOption: 'USER_ENTERED',
       resource: { values: [[email, passwordHash, club]] }
     });
   }
+}
+
+async function getInvoiceData(order_number) {
+  const sheets = await getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: 'Invoices!A:AK',
+  });
+  const rows = res.data.values || [];
+  const row = rows.find(r => r[0] && r[0] === order_number);
+  if (!row) return null;
+
+  // Column mapping (0-indexed):
+  // A=0 Order#, B=1 Email, C=2 Club, D=3 Address, E=4 ShipDate, F=5 PaymentLink
+  // G=6 URL1, H=7 Desc1, I=8 Qty1, J=9 Price1, K=10 OrigPrice1
+  // L=11 URL2, M=12 Desc2, N=13 Qty2, O=14 Price2, P=15 OrigPrice2
+  // Q=16 URL3, R=17 Desc3, S=18 Qty3, T=19 Price3, U=20 OrigPrice3
+  // V=21 Shipping, W=22 Subtotal, X=23 Embroidery, Y=24 ArtFee, Z=25 Total
+  // AA=26 URL4, AB=27 Desc4, AC=28 Qty4, AD=29 Price4, AE=30 OrigPrice4
+  // AF=31 URL5, AG=32 Desc5, AH=33 Qty5, AI=34 Price5, AJ=35 OrigPrice5
+
+  const itemOffsets = [
+    [6,7,8,9,10], [11,12,13,14,15], [16,17,18,19,20],
+    [26,27,28,29,30], [31,32,33,34,35]
+  ];
+  const items = [];
+  itemOffsets.forEach(([ui, di, qi, pi, oi]) => {
+    if (row[qi] && Number(row[qi]) > 0) {
+      const qty   = Number(row[qi]) || 0;
+      const price = Number(row[pi]) || 0;
+      items.push({
+        product:    'Custom Print Polo',
+        url:        row[ui] || '',
+        description: row[di] || '',
+        quantity:   qty,
+        price:      price,
+        orig_price: row[oi] ? Number(row[oi]) : null,
+        amount:     qty * price
+      });
+    }
+  });
+
+  return {
+    order_number:  row[0] || '',
+    customer_email: row[1] || '',
+    club:          row[2] || '',
+    address:       row[3] || '',
+    ship_date:     row[4] || '',
+    payment_link:  row[5] || '',
+    line_items:    items,
+    shipping:      Number(row[21]) || 0,
+    subtotal:      Number(row[22]) || 0,
+    embroidery:    Number(row[23]) || null,
+    art_setup:     Number(row[24]) || null,
+    total:         Number(row[25]) || 0,
+  };
 }
 
 // ── EMAIL via RESEND ──
@@ -92,12 +141,7 @@ async function sendEmail(to, subject, html) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
-    body: JSON.stringify({
-      from: 'Mayor Clothing <noreply@mayorclothing.com>',
-      to,
-      subject,
-      html
-    })
+    body: JSON.stringify({ from: 'Mayor Clothing <noreply@mayorclothing.com>', to, subject, html })
   });
   if (!res.ok) console.error('Resend error:', await res.text());
 }
@@ -137,7 +181,7 @@ async function sendReorderEmail(data) {
   );
 }
 
-// ── MIDDLEWARE: verify JWT cookie ──
+// ── AUTH MIDDLEWARE ──
 function requireAuth(req, res, next) {
   const token = req.cookies && req.cookies.mayor_token;
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
@@ -151,12 +195,10 @@ function requireAuth(req, res, next) {
 
 // ── ROUTES ──
 
-// Serve portal HTML
 router.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'portal.html'));
 });
 
-// Login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -166,7 +208,7 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
     const token = jwt.sign({ email: user.email, club: user.club }, JWT_SECRET, { expiresIn: '7d' });
-    res.cookie('mayor_token', token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('mayor_token', token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7*24*60*60*1000 });
     res.json({ email: user.email, club: user.club });
   } catch(e) {
     console.error('Login error:', e);
@@ -174,13 +216,11 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Logout
 router.post('/logout', (req, res) => {
   res.clearCookie('mayor_token');
   res.json({ ok: true });
 });
 
-// Forgot password
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -190,14 +230,13 @@ router.post('/forgot-password', async (req, res) => {
       const token = jwt.sign({ email, action: 'reset' }, JWT_SECRET, { expiresIn: '1h' });
       await sendResetEmail(email, token);
     }
-    res.json({ ok: true }); // always succeed to prevent email enumeration
+    res.json({ ok: true });
   } catch(e) {
     console.error('Forgot password error:', e);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Set / reset password
 router.post('/set-password', async (req, res) => {
   try {
     const { token, password } = req.body;
@@ -205,7 +244,6 @@ router.post('/set-password', async (req, res) => {
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
     const payload = jwt.verify(token, JWT_SECRET);
     const hash = await bcrypt.hash(password, 10);
-    // Get club from orders sheet
     const orders = await getOrdersFromSheet(payload.email);
     const club = orders.length ? orders[0].club : '';
     await upsertUser(payload.email, hash, club);
@@ -216,7 +254,6 @@ router.post('/set-password', async (req, res) => {
   }
 });
 
-// Get orders
 router.get('/orders', requireAuth, async (req, res) => {
   try {
     const orders = await getOrdersFromSheet(req.user.email);
@@ -227,11 +264,33 @@ router.get('/orders', requireAuth, async (req, res) => {
   }
 });
 
-// Reorder
+router.get('/invoice/:order_number', requireAuth, async (req, res) => {
+  try {
+    const invoiceData = await getInvoiceData(req.params.order_number);
+    if (!invoiceData) return res.status(404).json({ error: 'Invoice not available' });
+    const orders = await getOrdersFromSheet(req.user.email);
+    const owned = orders.find(o => o.order_number === req.params.order_number);
+    if (!owned) return res.status(403).json({ error: 'Not authorized' });
+    const generateRes = await fetch(`${BASE_URL}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(invoiceData)
+    });
+    if (!generateRes.ok) throw new Error('PDF generation failed: ' + await generateRes.text());
+    const buffer = Buffer.from(await generateRes.arrayBuffer());
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Mayor-Invoice-${req.params.order_number}.pdf"`);
+    res.send(buffer);
+  } catch(e) {
+    console.error('Invoice download error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.post('/reorder', requireAuth, async (req, res) => {
   try {
-    const { order_number, club, print, colors, qty, notes } = req.body;
-    await sendReorderEmail({ email: req.user.email, order_number, club, print, colors, qty, notes });
+    const { order_number, club, print, colors, qty, sizes, notes } = req.body;
+    await sendReorderEmail({ email: req.user.email, order_number, club, print, colors, qty, sizes, notes });
     res.json({ ok: true });
   } catch(e) {
     console.error('Reorder error:', e);
@@ -239,10 +298,9 @@ router.post('/reorder', requireAuth, async (req, res) => {
   }
 });
 
-// TEMP: test account creation endpoint — remove after testing
+// TEMP: test account creation — remove after testing
 router.get('/create-test-account', async (req, res) => {
   try {
-    const bcrypt = require('bcryptjs');
     const email = req.query.email;
     const password = req.query.password;
     const club = req.query.club || 'Test Club';
