@@ -1,7 +1,43 @@
 const express = require('express');
 const cors = require('cors');
 const PDFDocument = require('pdfkit');
+const { google } = require('googleapis');
 const app = express();
+
+// Google Sheets setup
+const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
+const SHEET_CREDS = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT || '{}');
+
+async function appendOrderToSheet(data) {
+  try {
+    if (!SHEET_CREDS.client_email) return; // skip if no creds configured
+    const auth = new google.auth.GoogleAuth({
+      credentials: SHEET_CREDS,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+    const sheets = google.sheets({ version: 'v4', auth });
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'Sheet1!A:H',
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [[
+          data.order_number || '',
+          data.customer_email || '',
+          data.club || '',
+          data.ship_date || '',
+          'Pending',
+          '', // Tracking Number — filled in manually
+          '', // Date Delivered — filled in manually
+          '', // Invoice Link — future use
+        ]]
+      }
+    });
+    console.log('Order logged to sheet:', data.order_number);
+  } catch(e) {
+    console.error('Sheet write failed:', e.message);
+  }
+}
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -228,6 +264,10 @@ app.post('/generate', (req, res) => {
              margin, pageH - 27, { align: 'center', width: contentW, characterSpacing: 0.5 });
 
     doc.end();
+
+    // Log order to Google Sheet (non-blocking)
+    appendOrderToSheet(data);
+
   } catch(e) {
     console.error(e);
     if (!res.headersSent) res.status(500).json({ error: e.message });
