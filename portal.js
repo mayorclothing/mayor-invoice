@@ -274,7 +274,7 @@ router.get('/invoice/:order_number', requireAuth, async (req, res) => {
     const generateRes = await fetch(`${BASE_URL}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(invoiceData)
+      body: JSON.stringify({ ...invoiceData, skip_logging: true })
     });
     if (!generateRes.ok) throw new Error('PDF generation failed: ' + await generateRes.text());
     const buffer = Buffer.from(await generateRes.arrayBuffer());
