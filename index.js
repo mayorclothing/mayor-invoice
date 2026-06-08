@@ -4,7 +4,7 @@ const PDFDocument = require('pdfkit');
 const { google } = require('googleapis');
 const cookieParser = require('cookie-parser');
 const path = require('path');
-const { router: portalRouter, sendSetupEmail, getOrdersFromSheet } = require('./portal');
+const { router: portalRouter, getOrdersFromSheet } = require('./portal');
 const app = express();
 
 app.use(cookieParser());
