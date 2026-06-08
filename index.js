@@ -35,13 +35,63 @@ async function appendOrderToSheet(data) {
           data.club || '',
           data.ship_date || '',
           'Pending',
-          '', // Tracking Number — filled in manually
-          '', // Date Delivered — filled in manually
-          '', // Invoice Link — future use
+          '',
+          '',
+          '',
         ]]
       }
     });
-    console.log('Order logged to sheet:', data.order_number);
+
+    // Write full invoice data to Invoices sheet
+    const items = data.line_items || [];
+    const get = (i, key) => items[i] ? (items[i][key] || '') : '';
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'Invoices!A:AK',
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [[
+          data.order_number || '',           // A
+          data.customer_email || '',         // B
+          data.club || '',                   // C
+          data.address || '',                // D
+          data.ship_date || '',              // E
+          data.payment_link || '',           // F
+          get(0,'url'),                      // G
+          get(0,'description'),              // H
+          get(0,'quantity'),                 // I
+          get(0,'price'),                    // J
+          get(0,'orig_price') || '',         // K
+          get(1,'url'),                      // L
+          get(1,'description'),              // M
+          get(1,'quantity'),                 // N
+          get(1,'price'),                    // O
+          get(1,'orig_price') || '',         // P
+          get(2,'url'),                      // Q
+          get(2,'description'),              // R
+          get(2,'quantity'),                 // S
+          get(2,'price'),                    // T
+          get(2,'orig_price') || '',         // U
+          data.shipping || '',               // V
+          data.subtotal || '',               // W
+          data.embroidery || '',             // X
+          data.art_setup || '',              // Y
+          data.total || '',                  // Z
+          get(3,'url'),                      // AA - Product URL 4
+          get(3,'description'),              // AB - Description 4
+          get(3,'quantity'),                 // AC - Qty 4
+          get(3,'price'),                    // AD - Price 4
+          get(3,'orig_price') || '',         // AE - Orig Price 4
+          get(4,'url'),                      // AF - Product URL 5
+          get(4,'description'),              // AG - Description 5
+          get(4,'quantity'),                 // AH - Qty 5
+          get(4,'price'),                    // AI - Price 5
+          get(4,'orig_price') || '',         // AJ - Orig Price 5
+        ]]
+      }
+    });
+
+    console.log('Order logged to both sheets:', data.order_number);
   } catch(e) {
     console.error('Sheet write failed:', e.message);
   }
