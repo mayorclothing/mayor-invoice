@@ -236,4 +236,20 @@ router.post('/reorder', requireAuth, async (req, res) => {
   }
 });
 
+// TEMP: test account creation endpoint — remove after testing
+router.get('/create-test-account', async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const email = req.query.email;
+    const password = req.query.password;
+    const club = req.query.club || 'Test Club';
+    if (!email || !password) return res.send('Add ?email=x&password=y to the URL');
+    const hash = await bcrypt.hash(password, 10);
+    await upsertUser(email, hash, club);
+    res.send(`Account created for ${email}. You can now log in at /orders`);
+  } catch(e) {
+    res.status(500).send('Error: ' + e.message);
+  }
+});
+
 module.exports = { router, sendSetupEmail, getOrdersFromSheet };
