@@ -391,29 +391,13 @@ function showOrder(idx) {
 
   document.getElementById('detail-order-number').textContent = 'Order: ' + o.order_number;
   const isClub = /club/i.test(o.club);
+  const clubLabel = isClub ? 'Club' : 'Client';
   document.getElementById('detail-club').textContent = o.club;
-  document.querySelector('#page-detail .detail-row .detail-key:nth-child(1)');
-  // Update Club/Client label
-  document.querySelectorAll('#detail-info .detail-row').forEach(row => {
-    const key = row.querySelector('.detail-key');
-    if (key && key.textContent === 'Club') key.textContent = isClub ? 'Club' : 'Client';
-  });
-
-  const statusClass = { pending: 'badge-pending', shipped: 'badge-shipped', delivered: 'badge-delivered' };
-  const badge = document.getElementById('detail-status-badge');
-  badge.textContent = o.status || 'Pending';
-  badge.className = 'badge ' + (statusClass[(o.status||'pending').toLowerCase()] || 'badge-pending');
-
   document.getElementById('detail-info').innerHTML = `
     <div class="detail-row"><span class="detail-key">Order #</span><span class="detail-val">${o.order_number}</span></div>
-    <div class="detail-row"><span class="detail-key">Club</span><span class="detail-val">${o.club}</span></div>
-    <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${o.ship_date}</span></div>
+    <div class="detail-row"><span class="detail-key">${clubLabel}</span><span class="detail-val">${o.club}</span></div>
+    <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${formatShipDate(o.ship_date)}</span></div>
     <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${o.status || 'Pending'}</span></div>`;
-
-  const trackingHTML = o.tracking_number
-    ? `<div class="detail-row"><span class="detail-key">Carrier</span><span class="detail-val">UPS</span></div>
-       <div class="detail-row"><span class="detail-key">Tracking</span><span class="detail-val"><a class="tracking-link" href="https://www.ups.com/track?tracknum=${o.tracking_number}" target="_blank">${o.tracking_number}</a></span></div>`
-    : `<div class="detail-row"><span class="detail-key">Tracking</span><span class="detail-val" style="color:#888;">Not yet available</span></div>`;
 
   document.getElementById('detail-shipping').innerHTML = trackingHTML;
   showPage('detail');
