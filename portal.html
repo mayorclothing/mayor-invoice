@@ -299,6 +299,36 @@ function showPage(name) {
 function showForgot() { showPage('forgot'); }
 
 // ── AUTH ──
+async function doCreateAccount() {
+  const email    = document.getElementById('create-email').value.trim();
+  const password = document.getElementById('create-password').value;
+  const confirm  = document.getElementById('create-confirm').value;
+  if (!email) { showAlert('create-alert', 'error', 'Please enter your email.'); return; }
+  if (password.length < 8) { showAlert('create-alert', 'error', 'Password must be at least 8 characters.'); return; }
+  if (password !== confirm) { showAlert('create-alert', 'error', 'Passwords do not match.'); return; }
+  const btn = document.getElementById('create-btn');
+  btn.disabled = true; btn.textContent = 'Creating account…';
+  try {
+    const res = await fetch('/portal/create-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create account');
+    showAlert('create-alert', 'success', 'Account created! Signing you in…');
+    setTimeout(() => {
+      document.getElementById('login-email').value = email;
+      document.getElementById('login-password').value = password;
+      doLogin();
+    }, 1000);
+  } catch(e) {
+    showAlert('create-alert', 'error', e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create account';
+  }
+}
+
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
