@@ -225,6 +225,85 @@ router.get('/orders', requireAuth, async (req, res) => {
   }
 });
 
+// Get invoice data from Invoices sheet
+async function getInvoiceData(order_number) {
+  const sheets = await getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: 'Invoices!A:AD',
+  });
+  const rows = res.data.values || [];
+  const row = rows.find(r => r[0] && r[0] === order_number);
+  if (!row) return null;
+  const items = [];
+  // Items 1-3 (cols G-R, index 6-17)
+  const itemOffsets = [[6,7,8,9],[10,11,12,13],[14,15,16,17],[22,23,24,25],[26,27,28,29]];
+  itemOffsets.forEach(([ui, di, qi, pi]) => {
+    if (row[qi] && Number(row[qi]) > 0) {
+      items.push({
+        product: 'Custom Print Polo',
+        url: row[ui] || '',
+        description: row[di] || '',
+        quantity: Number(row[qi]) || 0,
+        price: Number(row[pi]) || 0,
+        amount: (Number(row[qi]) || 0) * (Number(row[pi]) || 0)
+      });
+    }
+  });
+  return {
+    order_number: row[0] || '',
+    customer_email: row[1] || '',
+    club: row[2] || '',
+    address: row[3] || '',
+    ship_date: row[4] || '',
+    payment_link: row[5] || '',
+    line_items: items,
+    shipping: Number(row[18]) || 0,
+    subtotal: Number(row[19]) || 0,
+    embroidery: Number(row[20]) || null,
+    art_setup: Number(row[21]) || null,
+    total: (Number(row[19]) || 0) + (Number(row[18]) || 0),
+  };
+}
+
+// Download invoice PDF
+router.get('/invoice/:order_number', requireAuth, async (req, res) => {
+  try {
+    const PDFDocument = require('pdfkit');
+    const fs = require('fs');
+    const invoiceData = await getInvoiceData(req.params.order_number);
+    if (!invoiceData) return res.status(404).json({ error: 'Invoice not available' });
+
+    // Verify this order belongs to the logged-in user
+    const orders = await getOrdersFromSheet(req.user.email);
+    const owned = orders.find(o => o.order_number === req.params.order_number);
+    if (!owned) return res.status(403).json({ error: 'Not authorized' });
+
+    // Generate PDF directly using the same logic as /generate endpoint
+    const PDFDoc = require('pdfkit');
+    const LOGO_PATH = require('path').join(__dirname, 'Mayor_Logo_transparent.png');
+    
+    // Call generate function directly by requiring it
+    const generateRes = await fetch((process.env.BASE_URL || 'https://mayor-invoice.onrender.com') + '/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(invoiceData)
+    });
+    if (!generateRes.ok) {
+      const errText = await generateRes.text();
+      console.error('Generate failed:', errText);
+      throw new Error('PDF generation failed: ' + errText);
+    }
+    const buffer = Buffer.from(await generateRes.arrayBuffer());
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Mayor-Invoice-${req.params.order_number}.pdf"`);
+    res.send(buffer);
+  } catch(e) {
+    console.error('Invoice download error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Reorder
 router.post('/reorder', requireAuth, async (req, res) => {
   try {
