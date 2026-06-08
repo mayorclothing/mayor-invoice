@@ -11,7 +11,16 @@ app.use(cookieParser());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use('/portal', portalRouter);
-app.get('/orders', (req, res) => res.sendFile(path.join(__dirname, 'portal.html')));
+app.get('/orders', (req, res) => {
+  const filePath = path.join(__dirname, 'portal.html');
+  console.log('Serving portal from:', filePath);
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error('SendFile error:', err.message);
+      res.status(500).send('Portal file not found: ' + filePath);
+    }
+  });
+});
 
 // Google Sheets setup
 const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
