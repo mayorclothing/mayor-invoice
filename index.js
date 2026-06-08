@@ -2,7 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const PDFDocument = require('pdfkit');
 const { google } = require('googleapis');
+const cookieParser = require('cookie-parser');
+const path = require('path');
+const { router: portalRouter, sendSetupEmail, getOrdersFromSheet } = require('./portal');
 const app = express();
+
+app.use(cookieParser());
+app.use('/portal', portalRouter);
+app.get('/orders', (req, res) => res.sendFile(path.join(__dirname, 'portal.html')));
 
 // Google Sheets setup
 const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
@@ -265,8 +272,23 @@ app.post('/generate', (req, res) => {
 
     doc.end();
 
-    // Log order to Google Sheet (non-blocking)
-    appendOrderToSheet(data);
+    // Log order to Google Sheet and send setup email for new customers (non-blocking)
+    appendOrderToSheet(data).then(async () => {
+      try {
+        const { sendSetupEmail, getOrdersFromSheet } = require('./portal');
+        const existing = await getOrdersFromSheet(data.customer_email || '');
+        // Only send setup email if this is their first order
+        if (data.customer_email && existing.length <= 1) {
+          const jwt = require('jsonwebtoken');
+          const JWT_SECRET = process.env.JWT_SECRET || 'mayor-portal-secret-change-in-prod';
+          const token = jwt.sign({ email: data.customer_email, action: 'setup' }, JWT_SECRET, { expiresIn: '24h' });
+          await sendSetupEmail(data.customer_email, data.club, token);
+          console.log('Setup email sent to', data.customer_email);
+        }
+      } catch(e) {
+        console.error('Setup email error:', e.message);
+      }
+    });
 
   } catch(e) {
     console.error(e);
