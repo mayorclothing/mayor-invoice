@@ -509,6 +509,17 @@ window.addEventListener('load', () => {
     document.querySelector('#page-setpassword h1').textContent = 'Reset your password';
   }
 });
+function toggleSetPw(inputId, toggleId) {
+  const input = document.getElementById(inputId);
+  const toggle = document.getElementById(toggleId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    toggle.textContent = 'Hide';
+  } else {
+    input.type = 'password';
+    toggle.textContent = 'Show';
+  }
+}
 </script>
 </body>
 </html>
