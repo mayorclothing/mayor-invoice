@@ -113,7 +113,10 @@
     <div class="card">
       <div id="login-alert"></div>
       <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@yourclub.com" /></div>
-      <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" /></div>
+      <div class="field"><label>Password</label><div style="position:relative;">
+          <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:40px;" />
+          <span onclick="togglePw()" id="pw-toggle" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:13px;">Show</span>
+        </div></div>
       <button class="btn" onclick="doLogin()" id="login-btn">Sign in</button>
       <div style="text-align:center; margin-top:12px; font-size:13px; color:#888; display:flex; justify-content:space-between;">
         <a href="#" onclick="showForgot()" style="color:#888;">Forgot password?</a>
@@ -464,7 +467,7 @@ function showOrder(idx) {
 
   document.getElementById('detail-info').innerHTML = `
     <div class="detail-row"><span class="detail-key">Order #</span><span class="detail-val">${o.order_number}</span></div>
-    <div class="detail-row"><span class="detail-key">Club</span><span class="detail-val">${o.club}</span></div>
+    <div class="detail-row"><span class="detail-key">${/club/i.test(o.club) ? 'Club' : 'Client'}</span><span class="detail-val">${o.club}</span></div>
     <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${formatShipDate(o.ship_date)}</span></div>
     <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${o.status || 'Pending'}</span></div>`;
 
@@ -568,6 +571,13 @@ function formatShipDate(dateStr) {
   if (isNaN(d.getTime())) return dateStr;
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   return days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
+function togglePw() {
+  const input = document.getElementById('login-password');
+  const toggle = document.getElementById('pw-toggle');
+  if (input.type === 'password') { input.type = 'text'; toggle.textContent = 'Hide'; }
+  else { input.type = 'password'; toggle.textContent = 'Show'; }
 }
 
 function toggleSetPw(inputId, toggleId) {
