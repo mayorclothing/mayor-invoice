@@ -25,7 +25,7 @@ async function appendOrderToSheet(data) {
     const sheets = google.sheets({ version: 'v4', auth });
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'Sheet1!A:H',
+      range: 'Order Info!A:H',
       valueInputOption: 'USER_ENTERED',
       resource: {
         values: [[
