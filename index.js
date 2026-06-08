@@ -24,9 +24,16 @@ async function appendOrderToSheet(data) {
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
     const sheets = google.sheets({ version: 'v4', auth });
-    await sheets.spreadsheets.values.append({
+    // Check for duplicates before writing to Order Info
+    const existingRows = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: 'Order Info!A:H',
+      range: 'Order Info!A:A',
+    });
+    const existingOrders = (existingRows.data.values || []).map(r => r[0]);
+    if (!existingOrders.includes(data.order_number)) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID,
+        range: 'Order Info!A:H',
       valueInputOption: 'USER_ENTERED',
       resource: {
         values: [[
@@ -41,6 +48,7 @@ async function appendOrderToSheet(data) {
         ]]
       }
     });
+    }
 
     // Write full invoice data to Invoices sheet
     const items = data.line_items || [];
@@ -324,7 +332,8 @@ app.post('/generate', (req, res) => {
     doc.end();
 
     // Log order to Google Sheet and send setup email for new customers (non-blocking)
-    appendOrderToSheet(data).then(async () => {
+    // Skip if this is a portal re-generation (invoice download)
+    if (!data.skip_logging) appendOrderToSheet(data).then(async () => {
       try {
         const { sendSetupEmail, getOrdersFromSheet } = require('./portal');
         const existing = await getOrdersFromSheet(data.customer_email || '');
