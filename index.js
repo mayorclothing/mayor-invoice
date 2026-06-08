@@ -8,6 +8,8 @@ const { router: portalRouter, sendSetupEmail, getOrdersFromSheet } = require('./
 const app = express();
 
 app.use(cookieParser());
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
 app.use('/portal', portalRouter);
 app.get('/orders', (req, res) => res.sendFile(path.join(__dirname, 'portal.html')));
 
@@ -80,8 +82,7 @@ async function appendOrderToSheet(data) {
   }
 }
 
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+
 
 const LOGO_PATH = __dirname + '/Mayor_Logo_transparent.png';
 
