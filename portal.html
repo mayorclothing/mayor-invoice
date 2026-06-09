@@ -87,7 +87,7 @@
   .radio-opt input[type="radio"]:checked + label { border-color: #1a1a18; background: #1a1a18; color: white; }
 
   /* MODAL OVERLAY */
-  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 100; align-items: flex-start; justify-content: center; padding-top: 60px; }
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
   .modal { background: white; border-radius: 12px; padding: 1.5rem; width: 90%; max-width: 440px; }
   .modal h2 { margin-bottom: 1rem; }
@@ -96,7 +96,7 @@
 <body>
 
 <nav>
-  <div class="nav-logo"><img src="/mayor-logo.png" style="height:32px;" /></div>
+  <div class="nav-logo">Mayor</div>
   <div class="nav-right" id="nav-right">
     <span id="nav-email"></span>
     <span id="nav-logout" style="display:none;"> · <a href="#" onclick="logout()">Sign out</a></span>
@@ -112,15 +112,11 @@
     </div>
     <div class="card">
       <div id="login-alert"></div>
-      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@yourclub.com" /></div>
-      <div class="field"><label>Password</label><div style="position:relative;">
-          <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:40px;" />
-          <span onclick="togglePw()" id="pw-toggle" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:13px;">Show</span>
-        </div></div>
+      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" /></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" /></div>
       <button class="btn" onclick="doLogin()" id="login-btn">Sign in</button>
-      <div style="text-align:center; margin-top:12px; font-size:13px; color:#888; display:flex; justify-content:space-between;">
+      <div style="text-align:center; margin-top:12px; font-size:13px; color:#888;">
         <a href="#" onclick="showForgot()" style="color:#888;">Forgot password?</a>
-        <a href="#" onclick="showPage('create-account')" style="color:#888;">Create account</a>
       </div>
     </div>
   </div>
@@ -134,36 +130,8 @@
     <p class="subtitle" style="margin-bottom:1.5rem;">Enter your email and we'll send you a link to reset your password.</p>
     <div class="card">
       <div id="forgot-alert"></div>
-      <div class="field"><label>Email</label><input type="email" id="forgot-email" placeholder="you@yourclub.com" /></div>
+      <div class="field"><label>Email</label><input type="email" id="forgot-email" placeholder="you@example.com" /></div>
       <button class="btn" onclick="doForgot()" id="forgot-btn">Send reset link</button>
-    </div>
-  </div>
-</div>
-
-<!-- PAGE: CREATE ACCOUNT -->
-<div class="page" id="page-create-account">
-  <div class="container" style="max-width:420px;">
-    <span class="back" onclick="showPage('login')">← Back to sign in</span>
-    <h1>Create your account</h1>
-    <p class="subtitle" style="margin-bottom:1.5rem;">Enter your email and choose a password to access your Mayor orders.</p>
-    <div class="card">
-      <div id="create-alert"></div>
-      <div class="field"><label>Email</label><input type="email" id="create-email" placeholder="you@example.com" /></div>
-      <div class="field">
-        <label>Password</label>
-        <div style="position:relative;">
-          <input type="password" id="create-password" placeholder="At least 8 characters" style="padding-right:40px;" />
-          <span onclick="toggleSetPw('create-password','toggle-create')" id="toggle-create" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:13px;">Show</span>
-        </div>
-      </div>
-      <div class="field">
-        <label>Confirm password</label>
-        <div style="position:relative;">
-          <input type="password" id="create-confirm" placeholder="Repeat password" style="padding-right:40px;" />
-          <span onclick="toggleSetPw('create-confirm','toggle-create-confirm')" id="toggle-create-confirm" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:13px;">Show</span>
-        </div>
-      </div>
-      <button class="btn" onclick="doCreateAccount()" id="create-btn">Create account</button>
     </div>
   </div>
 </div>
@@ -175,20 +143,8 @@
     <p class="subtitle" style="margin-bottom:1.5rem;">Choose a password to access your Mayor orders portal.</p>
     <div class="card">
       <div id="setpw-alert"></div>
-      <div class="field">
-        <label>New password</label>
-        <div style="position:relative;">
-          <input type="password" id="setpw-password" placeholder="At least 8 characters" style="padding-right:40px;" />
-          <span onclick="toggleSetPw('setpw-password','toggle-setpw')" id="toggle-setpw" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:13px;">Show</span>
-        </div>
-      </div>
-      <div class="field">
-        <label>Confirm password</label>
-        <div style="position:relative;">
-          <input type="password" id="setpw-confirm" placeholder="Repeat password" style="padding-right:40px;" />
-          <span onclick="toggleSetPw('setpw-confirm','toggle-confirm')" id="toggle-confirm" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:13px;">Show</span>
-        </div>
-      </div>
+      <div class="field"><label>New password</label><input type="password" id="setpw-password" placeholder="At least 8 characters" /></div>
+      <div class="field"><label>Confirm password</label><input type="password" id="setpw-confirm" placeholder="Repeat password" /></div>
       <button class="btn" onclick="doSetPassword()" id="setpw-btn">Set password</button>
     </div>
   </div>
@@ -243,7 +199,7 @@
         <div class="card">
           <p class="section-label">Reorder</p>
           <p style="font-size:13px; color:#888; margin-bottom:12px;">Want to place another order? Let us know your preferences and we'll be in touch.</p>
-          <button class="btn" onclick="showReorder()">Request Reorder</button>
+          <button class="btn btn-outline" onclick="showReorder()">Request Reorder</button>
         </div>
       </div>
 
@@ -272,17 +228,8 @@
       </div>
     </div>
     <div class="field">
-      <label>Sizes <span style="color:#888;font-size:12px;">(minimum total 24)</span></label>
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-        <div><label style="font-size:11px;color:#888;">XS</label><input type="number" id="qty-xs" min="0" placeholder="0" oninput="updateQtyTotal()" /></div>
-        <div><label style="font-size:11px;color:#888;">S</label><input type="number" id="qty-s" min="0" placeholder="0" oninput="updateQtyTotal()" /></div>
-        <div><label style="font-size:11px;color:#888;">M</label><input type="number" id="qty-m" min="0" placeholder="0" oninput="updateQtyTotal()" /></div>
-        <div><label style="font-size:11px;color:#888;">L</label><input type="number" id="qty-l" min="0" placeholder="0" oninput="updateQtyTotal()" /></div>
-        <div><label style="font-size:11px;color:#888;">XL</label><input type="number" id="qty-xl" min="0" placeholder="0" oninput="updateQtyTotal()" /></div>
-        <div><label style="font-size:11px;color:#888;">XXL</label><input type="number" id="qty-xxl" min="0" placeholder="0" oninput="updateQtyTotal()" /></div>
-        <div><label style="font-size:11px;color:#888;">3XL</label><input type="number" id="qty-3xl" min="0" placeholder="0" oninput="updateQtyTotal()" /></div>
-      </div>
-      <div style="margin-top:8px;font-size:13px;color:#888;">Total: <strong id="qty-total-display">0</strong></div>
+      <label>Quantity</label>
+      <input type="number" id="reorder-qty" placeholder="e.g. 24" min="1" />
     </div>
     <div class="field">
       <label>Additional notes (optional)</label>
@@ -311,36 +258,6 @@ function showPage(name) {
 function showForgot() { showPage('forgot'); }
 
 // ── AUTH ──
-async function doCreateAccount() {
-  const email    = document.getElementById('create-email').value.trim();
-  const password = document.getElementById('create-password').value;
-  const confirm  = document.getElementById('create-confirm').value;
-  if (!email) { showAlert('create-alert', 'error', 'Please enter your email.'); return; }
-  if (password.length < 8) { showAlert('create-alert', 'error', 'Password must be at least 8 characters.'); return; }
-  if (password !== confirm) { showAlert('create-alert', 'error', 'Passwords do not match.'); return; }
-  const btn = document.getElementById('create-btn');
-  btn.disabled = true; btn.textContent = 'Creating account…';
-  try {
-    const res = await fetch('/portal/create-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to create account');
-    showAlert('create-alert', 'success', 'Account created! Signing you in…');
-    setTimeout(() => {
-      document.getElementById('login-email').value = email;
-      document.getElementById('login-password').value = password;
-      doLogin();
-    }, 1000);
-  } catch(e) {
-    showAlert('create-alert', 'error', e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = 'Create account';
-  }
-}
-
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
@@ -467,8 +384,8 @@ function showOrder(idx) {
 
   document.getElementById('detail-info').innerHTML = `
     <div class="detail-row"><span class="detail-key">Order #</span><span class="detail-val">${o.order_number}</span></div>
-    <div class="detail-row"><span class="detail-key">${/club/i.test(o.club) ? 'Club' : 'Client'}</span><span class="detail-val">${o.club}</span></div>
-    <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${formatShipDate(o.ship_date)}</span></div>
+    <div class="detail-row"><span class="detail-key">Club</span><span class="detail-val">${o.club}</span></div>
+    <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${o.ship_date}</span></div>
     <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${o.status || 'Pending'}</span></div>`;
 
   const trackingHTML = o.tracking_number
@@ -500,25 +417,13 @@ async function downloadInvoice() {
 function showReorder() { document.getElementById('reorder-modal').classList.add('open'); }
 function closeReorder() { document.getElementById('reorder-modal').classList.remove('open'); }
 
-function updateQtyTotal() {
-  const sizes = ['xs','s','m','l','xl','xxl','3xl'];
-  const total = sizes.reduce((s,sz) => s + (parseInt(document.getElementById('qty-'+sz).value)||0), 0);
-  document.getElementById('qty-total-display').textContent = total;
-}
-
 async function submitReorder() {
   const print  = document.querySelector('input[name="reorder-print"]:checked').value;
   const colors = document.querySelector('input[name="reorder-colors"]:checked').value;
+  const qty    = document.getElementById('reorder-qty').value;
   const notes  = document.getElementById('reorder-notes').value;
-  const sizes = ['xs','s','m','l','xl','xxl','3xl'];
-  const sizeBreakdown = {};
-  let total = 0;
-  sizes.forEach(sz => {
-    const v = parseInt(document.getElementById('qty-'+sz).value)||0;
-    if (v > 0) sizeBreakdown[sz.toUpperCase()] = v;
-    total += v;
-  });
-  if (total < 24) { showAlert('reorder-alert', 'error', 'Minimum order is 24 units.'); return; }
+
+  if (!qty) { showAlert('reorder-alert', 'error', 'Please enter a quantity.'); return; }
 
   const btn = document.getElementById('reorder-btn');
   btn.disabled = true; btn.textContent = 'Submitting…';
@@ -531,7 +436,7 @@ async function submitReorder() {
       body: JSON.stringify({
         order_number: currentOrder.order_number,
         club: currentOrder.club,
-        print, colors, qty: total, sizes: sizeBreakdown, notes
+        print, colors, qty, notes
       })
     });
     if (!res.ok) throw new Error('Failed to submit');
@@ -563,34 +468,6 @@ window.addEventListener('load', () => {
     document.querySelector('#page-setpassword h1').textContent = 'Reset your password';
   }
 });
-function formatShipDate(dateStr) {
-  if (!dateStr) return '—';
-  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  if (days.some(d => dateStr.startsWith(d))) return dateStr;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  return days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
-}
-
-function togglePw() {
-  const input = document.getElementById('login-password');
-  const toggle = document.getElementById('pw-toggle');
-  if (input.type === 'password') { input.type = 'text'; toggle.textContent = 'Hide'; }
-  else { input.type = 'password'; toggle.textContent = 'Show'; }
-}
-
-function toggleSetPw(inputId, toggleId) {
-  const input = document.getElementById(inputId);
-  const toggle = document.getElementById(toggleId);
-  if (input.type === 'password') {
-    input.type = 'text';
-    toggle.textContent = 'Hide';
-  } else {
-    input.type = 'password';
-    toggle.textContent = 'Show';
-  }
-}
 </script>
 </body>
 </html>
