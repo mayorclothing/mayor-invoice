@@ -229,15 +229,15 @@
     </div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-      <div class="card">
-        <p class="section-label">Invoice</p>
-        <p style="font-size:13px; color:#888; margin-bottom:12px;">Download your invoice PDF. Available once your order has been confirmed and invoiced.</p>
-        <button class="btn" onclick="downloadInvoice()">Download Invoice PDF</button>
-      </div>
-      <div class="card">
+      <div class="card" style="display:flex; flex-direction:column;">
         <p class="section-label">Order Confirmation</p>
-        <p style="font-size:13px; color:#888; margin-bottom:12px;">Download your order confirmation PDF.</p>
+        <p style="font-size:13px; color:#888; margin-bottom:12px; flex:1;">Review your order details above. Email <a href="mailto:mayor@mayorclothing.com" style="color:#1a1a18;">mayor@mayorclothing.com</a> to confirm or request any changes.</p>
         <button class="btn" onclick="downloadConfirmation()">Download Order Confirmation PDF</button>
+      </div>
+      <div class="card" style="display:flex; flex-direction:column;">
+        <p class="section-label">Invoice</p>
+        <p style="font-size:13px; color:#888; margin-bottom:12px; flex:1;">Download your invoice PDF. Available once your order has been confirmed and invoiced.</p>
+        <button class="btn" onclick="downloadInvoice()">Download Invoice PDF</button>
       </div>
     </div>
     <div style="margin-top:1rem;">
