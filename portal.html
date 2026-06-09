@@ -539,6 +539,12 @@ async function showOrder(idx) {
     document.getElementById('detail-items-label').textContent =
       d.source === 'invoice' ? 'Order Details (Invoice)' : 'Order Details (Order Confirmation)';
 
+    // Update Order Info to include product page link if available
+    if (d.product_page) {
+      const infoEl = document.getElementById('detail-info');
+      infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Product Page</span><span class="detail-val"><a href="${d.product_page}" target="_blank" style="color:#1a1a18;">View Products</a></span></div>`;
+    }
+
     let html = '';
 
     // Line items table header
@@ -555,9 +561,13 @@ async function showOrder(idx) {
         ? `<span style="text-decoration:line-through; color:#aaa; display:block; font-size:12px;">${fmtMoney(item.orig_price)}</span><span>${fmtMoney(item.price)}</span>`
         : fmtMoney(item.price);
 
+      const imgHTML = item.url
+        ? `<a href="${item.url}" target="_blank"><img src="${item.url}" alt="Product" style="width:72px; height:72px; object-fit:cover; border-radius:6px; display:block; margin-bottom:6px;" /></a>`
+        : '';
+
       html += `<div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:0; padding:10px 0; border-bottom:1px solid #f0f0ee; align-items:start;">
         <div>
-          <div style="font-size:13px; font-weight:600; margin-bottom:2px;">Custom Print Polo</div>
+          ${imgHTML}
           ${desc ? `<div style="font-size:12px; color:#666; margin-bottom:2px;">${desc}</div>` : ''}
           ${sizes ? `<div style="font-size:12px; color:#888;">${sizes}</div>` : ''}
         </div>
