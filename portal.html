@@ -293,6 +293,16 @@ function togglePw(inputId, toggleId) {
   else { input.type = 'password'; toggle.textContent = 'Show'; }
 }
 
+function formatShipDate(dateStr) {
+  if (!dateStr) return '—';
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  if (days.some(d => dateStr.startsWith(d))) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
