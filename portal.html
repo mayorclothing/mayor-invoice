@@ -235,6 +235,13 @@
         <button class="btn" onclick="downloadInvoice()">Download Invoice PDF</button>
       </div>
       <div class="card">
+        <p class="section-label">Order Confirmation</p>
+        <p style="font-size:13px; color:#888; margin-bottom:12px;">Download your order confirmation PDF.</p>
+        <button class="btn" onclick="downloadConfirmation()">Download Order Confirmation PDF</button>
+      </div>
+    </div>
+    <div style="margin-top:1rem;">
+      <div class="card">
         <p class="section-label">Reorder</p>
         <p style="font-size:13px; color:#888; margin-bottom:12px;">Want to place another order? Let us know your preferences and we'll be in touch.</p>
         <button class="btn" onclick="showReorder()">Request Reorder</button>
@@ -465,17 +472,19 @@ async function loadOrders() {
 function parseSizes(desc) {
   const order = ['XS','S','M','L','XL','XXL','3XL'];
   const found = {};
-  const pattern = /\b(XS|3XL|XXL|XL|S|M|L):\s*(\d+)/g;
+  // Match size labels only when preceded by start, space, comma, or dash — not mid-word
+  const pattern = /(?:^|[\s,\-–\/])((XS|3XL|XXL|XL|S|M|L)):\s*(\d+)/g;
   let match;
   while ((match = pattern.exec(desc)) !== null) {
-    found[match[1].toUpperCase()] = match[2];
+    found[match[2].toUpperCase()] = match[3];
   }
   return order.filter(s => found[s]).map(s => s + ': ' + found[s]).join(', ');
 }
 
 function stripSizes(desc) {
+  // Remove size tokens like "S: 2" only when preceded by start, space, comma, or dash
   return desc
-    .replace(/\b(XS|3XL|XXL|XL|S|M|L):\s*\d+/g, '')
+    .replace(/(?:^|[\s,\-–\/])(XS|3XL|XXL|XL|S|M|L):\s*\d+/g, '')
     .replace(/\s*[-–]\s*/g, ' ')
     .replace(/,\s*,/g, ',')
     .replace(/^[\s,\-–]+|[\s,\-–]+$/g, '')
@@ -600,6 +609,22 @@ async function downloadInvoice() {
     a.click();
   } catch(e) {
     alert('Could not download invoice: ' + e.message);
+  }
+}
+
+async function downloadConfirmation() {
+  if (!currentOrder) return;
+  try {
+    const res = await fetch('/portal/confirmation/' + encodeURIComponent(currentOrder.order_number), { credentials: 'include' });
+    if (!res.ok) throw new Error('Order confirmation not available');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Mayor-Order-Confirmation-${currentOrder.order_number}.pdf`;
+    a.click();
+  } catch(e) {
+    alert('Could not download order confirmation: ' + e.message);
   }
 }
 
