@@ -9,6 +9,7 @@ const app = express();
 
 app.use(cookieParser());
 app.use('/portal', portalRouter);
+app.get('/', (req, res) => res.redirect('/orders'));
 app.get('/orders', (req, res) => res.sendFile(path.join(__dirname, 'portal.html')));
 
 // Google Sheets setup
