@@ -112,6 +112,7 @@ function parseSheetRow(row) {
       const qty   = Number(row[qi]) || 0;
       const price = Number(row[pi]) || 0;
       items.push({
+        product:     'Custom Print Polo',
         url:        row[ui] || '',
         description: row[di] || '',
         quantity:   qty,
