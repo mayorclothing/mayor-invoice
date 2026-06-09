@@ -155,7 +155,12 @@ app.post('/generate', async (req, res) => {
     const isClub = /club/i.test(club);
     const clubLabel = isClub ? 'Club' : 'Client';
     doc.font('Times-Bold').text(clubLabel, margin, ly, { continued: true })
-       .font('Times-Roman').text(': ' + club, { width: leftW });
+       .font('Times-Roman').text(': ', { continued: true });
+    if (data.product_page) {
+      doc.text(club, { width: leftW, link: data.product_page, underline: true });
+    } else {
+      doc.text(club, { width: leftW });
+    }
     ly += doc.heightOfString('Club: ' + club, { width: leftW }) + 10;
 
     doc.font('Times-Bold').text('Shipping / Billing Address:', margin, ly, { width: leftW });
