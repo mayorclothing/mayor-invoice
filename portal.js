@@ -36,7 +36,7 @@ async function getOrdersFromSheet(email) {
       email:           r[1] || '',
       club:            r[2] || '',
       ship_date:       r[3] || '',
-      status:          r[4] || 'Pending',
+      status:          r[4] || 'Awaiting Approval',
       tracking_number: r[5] || '',
       date_delivered:  r[6] || '',
     }));
@@ -79,16 +79,29 @@ async function upsertUser(email, passwordHash, club) {
   }
 }
 
-async function getInvoiceData(order_number) {
+// Check if email has orders in Order Info, Order Confirmations, or Invoices
+async function emailHasOrders(email) {
   const sheets = await getSheets();
+  // Check Order Info first (fastest)
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Invoices!A:AK',
+    range: 'Order Info!A:B',
   });
   const rows = res.data.values || [];
-  const row = rows.find(r => r[0] && r[0] === order_number);
-  if (!row) return null;
+  return rows.some(r => r[1] && r[1].toLowerCase() === email.toLowerCase());
+}
 
+// Parse row data (columns A-AK) into structured invoice/confirmation object
+function parseSheetRow(row) {
+  if (!row) return null;
+  // Column mapping (0-indexed):
+  // A=0 Order#, B=1 Email, C=2 Club, D=3 Address, E=4 ShipDate, F=5 PaymentLink
+  // G=6 URL1, H=7 Desc1, I=8 Qty1, J=9 Price1, K=10 OrigPrice1
+  // L=11 URL2, M=12 Desc2, N=13 Qty2, O=14 Price2, P=15 OrigPrice2
+  // Q=16 URL3, R=17 Desc3, S=18 Qty3, T=19 Price3, U=20 OrigPrice3
+  // V=21 Shipping, W=22 Subtotal, X=23 Embroidery, Y=24 ArtFee, Z=25 Total
+  // AA=26 URL4, AB=27 Desc4, AC=28 Qty4, AD=29 Price4, AE=30 OrigPrice4
+  // AF=31 URL5, AG=32 Desc5, AH=33 Qty5, AI=34 Price5, AJ=35 OrigPrice5
   const itemOffsets = [
     [6,7,8,9,10], [11,12,13,14,15], [16,17,18,19,20],
     [26,27,28,29,30], [31,32,33,34,35]
@@ -99,17 +112,15 @@ async function getInvoiceData(order_number) {
       const qty   = Number(row[qi]) || 0;
       const price = Number(row[pi]) || 0;
       items.push({
-        product:     'Custom Print Polo',
-        url:         row[ui] || '',
+        url:        row[ui] || '',
         description: row[di] || '',
-        quantity:    qty,
-        price:       price,
-        orig_price:  row[oi] ? Number(row[oi]) : null,
-        amount:      qty * price
+        quantity:   qty,
+        price:      price,
+        orig_price: row[oi] ? Number(row[oi]) : null,
+        amount:     qty * price
       });
     }
   });
-
   return {
     order_number:   row[0] || '',
     customer_email: row[1] || '',
@@ -120,10 +131,35 @@ async function getInvoiceData(order_number) {
     line_items:     items,
     shipping:       Number(row[21]) || 0,
     subtotal:       Number(row[22]) || 0,
-    embroidery:     Number(row[23]) || null,
-    art_setup:      Number(row[24]) || null,
+    embroidery:     Number(row[23]) || 0,
+    art_setup:      Number(row[24]) || 0,
     total:          Number(row[25]) || 0,
   };
+}
+
+// Get invoice data — checks Invoices first, then Order Confirmations
+async function getOrderDetailData(order_number) {
+  const sheets = await getSheets();
+
+  // Try Invoices sheet first
+  const invRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: 'Invoices!A:AK',
+  });
+  const invRows = invRes.data.values || [];
+  const invRow = invRows.find(r => r[0] && r[0] === order_number);
+  if (invRow) return { ...parseSheetRow(invRow), source: 'invoice' };
+
+  // Fall back to Order Confirmations
+  const confRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: 'Order Confirmations!A:AK',
+  });
+  const confRows = confRes.data.values || [];
+  const confRow = confRows.find(r => r[0] && r[0] === order_number);
+  if (confRow) return { ...parseSheetRow(confRow), source: 'confirmation' };
+
+  return null;
 }
 
 // ── EMAIL ──
@@ -234,17 +270,19 @@ router.post('/set-password', async (req, res) => {
   }
 });
 
+// Create account — allowed if email has any order in Order Info
 router.post('/create-account', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    const orders = await getOrdersFromSheet(email);
-    if (!orders.length) return res.status(403).json({ error: 'No orders found for this email. Please contact Mayor Clothing.' });
+    const hasOrders = await emailHasOrders(email);
+    if (!hasOrders) return res.status(403).json({ error: 'No orders found for this email. Please contact Mayor Clothing.' });
     const existing = await getUserFromSheet(email);
     if (existing && existing.passwordHash) return res.status(400).json({ error: 'An account already exists for this email. Use Forgot password to reset it.' });
+    const orders = await getOrdersFromSheet(email);
     const hash = await bcrypt.hash(password, 10);
-    await upsertUser(email, hash, orders[0].club || '');
+    await upsertUser(email, hash, orders[0]?.club || '');
     res.json({ ok: true });
   } catch(e) {
     console.error('Create account error:', e);
@@ -252,6 +290,7 @@ router.post('/create-account', async (req, res) => {
   }
 });
 
+// Get orders list
 router.get('/orders', requireAuth, async (req, res) => {
   try {
     const orders = await getOrdersFromSheet(req.user.email);
@@ -262,13 +301,38 @@ router.get('/orders', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/invoice/:order_number', requireAuth, async (req, res) => {
+// Get full order detail (confirmation or invoice data)
+router.get('/order-detail/:order_number', requireAuth, async (req, res) => {
   try {
-    const invoiceData = await getInvoiceData(req.params.order_number);
-    if (!invoiceData) return res.status(404).json({ error: 'Invoice not available' });
     const orders = await getOrdersFromSheet(req.user.email);
     const owned = orders.find(o => o.order_number === req.params.order_number);
     if (!owned) return res.status(403).json({ error: 'Not authorized' });
+    const detail = await getOrderDetailData(req.params.order_number);
+    if (!detail) return res.status(404).json({ error: 'Order details not available yet' });
+    res.json(detail);
+  } catch(e) {
+    console.error('Order detail error:', e);
+    res.status(500).json({ error: 'Could not load order details' });
+  }
+});
+
+// Download invoice PDF — only works if invoice exists
+router.get('/invoice/:order_number', requireAuth, async (req, res) => {
+  try {
+    const orders = await getOrdersFromSheet(req.user.email);
+    const owned = orders.find(o => o.order_number === req.params.order_number);
+    if (!owned) return res.status(403).json({ error: 'Not authorized' });
+
+    // Only generate PDF from Invoices sheet (not confirmations)
+    const sheets = await getSheets();
+    const invRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'Invoices!A:AK',
+    });
+    const invRow = (invRes.data.values || []).find(r => r[0] && r[0] === req.params.order_number);
+    if (!invRow) return res.status(404).json({ error: 'Invoice not available yet. Your order confirmation is still being reviewed.' });
+
+    const invoiceData = parseSheetRow(invRow);
     const generateRes = await fetch('https://mayor-invoice.onrender.com/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -285,6 +349,7 @@ router.get('/invoice/:order_number', requireAuth, async (req, res) => {
   }
 });
 
+// Reorder
 router.post('/reorder', requireAuth, async (req, res) => {
   try {
     const { order_number, club, print, colors, qty, sizes, notes } = req.body;
