@@ -245,7 +245,7 @@
 
 <!-- REORDER MODAL -->
 <div class="modal-overlay" id="reorder-modal">
-  <div class="modal">
+  <div class="modal" style="max-height:none; overflow-y:visible;">
     <h2>Request a Reorder</h2>
     <p style="font-size:13px; color:#888; margin-bottom:1rem;">We'll reach out to confirm details and pricing.</p>
     <div id="reorder-alert"></div>
@@ -264,8 +264,17 @@
       </div>
     </div>
     <div class="field">
-      <label>Quantity</label>
-      <input type="number" id="reorder-qty" placeholder="e.g. 24" min="1" />
+      <label>Sizes <span style="color:#888; font-size:12px;">(minimum total 24)</span></label>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px;">
+        <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">XS</label><input type="number" id="qty-xs" min="0" placeholder="0" oninput="updateQtyTotal()" style="padding:6px 8px;font-size:13px;" /></div>
+        <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">S</label><input type="number" id="qty-s" min="0" placeholder="0" oninput="updateQtyTotal()" style="padding:6px 8px;font-size:13px;" /></div>
+        <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">M</label><input type="number" id="qty-m" min="0" placeholder="0" oninput="updateQtyTotal()" style="padding:6px 8px;font-size:13px;" /></div>
+        <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">L</label><input type="number" id="qty-l" min="0" placeholder="0" oninput="updateQtyTotal()" style="padding:6px 8px;font-size:13px;" /></div>
+        <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">XL</label><input type="number" id="qty-xl" min="0" placeholder="0" oninput="updateQtyTotal()" style="padding:6px 8px;font-size:13px;" /></div>
+        <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">XXL</label><input type="number" id="qty-xxl" min="0" placeholder="0" oninput="updateQtyTotal()" style="padding:6px 8px;font-size:13px;" /></div>
+        <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">3XL</label><input type="number" id="qty-3xl" min="0" placeholder="0" oninput="updateQtyTotal()" style="padding:6px 8px;font-size:13px;" /></div>
+      </div>
+      <div style="margin-top:8px; font-size:13px; color:#888;">Total: <strong id="qty-total-display">0</strong></div>
     </div>
     <div class="field">
       <label>Additional notes (optional)</label>
@@ -454,18 +463,22 @@ async function loadOrders() {
 }
 
 function parseSizes(desc) {
-  const sizePattern = /\b(XS|S|M|L|XL|XXL|2XL|3XL)\s*[:\-–]\s*(\d+)/gi;
-  const found = [];
+  const order = ['XS','S','M','L','XL','XXL','3XL'];
+  const found = {};
+  const pattern = /\b(XS|3XL|XXL|XL|S|M|L):\s*(\d+)/g;
   let match;
-  while ((match = sizePattern.exec(desc)) !== null) {
-    found.push(match[1].toUpperCase() + ': ' + match[2]);
+  while ((match = pattern.exec(desc)) !== null) {
+    found[match[1].toUpperCase()] = match[2];
   }
-  return found.join(', ');
+  return order.filter(s => found[s]).map(s => s + ': ' + found[s]).join(', ');
 }
 
 function stripSizes(desc) {
   return desc
-    .replace(/\b(XS|S|M|L|XL|XXL|2XL|3XL)\s*[:\-–]\s*\d+\s*[,\/]?\s*/gi, '')
+    .replace(/\b(XS|3XL|XXL|XL|S|M|L):\s*\d+/g, '')
+    .replace(/\s*[-–]\s*/g, ' ')
+    .replace(/,\s*,/g, ',')
+    .replace(/^[\s,\-–]+|[\s,\-–]+$/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -594,13 +607,25 @@ async function downloadInvoice() {
 function showReorder() { document.getElementById('reorder-modal').classList.add('open'); }
 function closeReorder() { document.getElementById('reorder-modal').classList.remove('open'); }
 
+function updateQtyTotal() {
+  const sizes = ['xs','s','m','l','xl','xxl','3xl'];
+  const total = sizes.reduce((sum, s) => sum + (parseInt(document.getElementById('qty-'+s).value)||0), 0);
+  document.getElementById('qty-total-display').textContent = total;
+}
+
 async function submitReorder() {
   const print  = document.querySelector('input[name="reorder-print"]:checked').value;
   const colors = document.querySelector('input[name="reorder-colors"]:checked').value;
-  const qty    = document.getElementById('reorder-qty').value;
   const notes  = document.getElementById('reorder-notes').value;
-
-  if (!qty) { showAlert('reorder-alert', 'error', 'Please enter a quantity.'); return; }
+  const sizeKeys = ['xs','s','m','l','xl','xxl','3xl'];
+  const sizes = {};
+  let total = 0;
+  sizeKeys.forEach(s => {
+    const v = parseInt(document.getElementById('qty-'+s).value)||0;
+    if (v > 0) sizes[s.toUpperCase()] = v;
+    total += v;
+  });
+  if (total < 24) { showAlert('reorder-alert', 'error', 'Minimum order is 24 units.'); return; }
 
   const btn = document.getElementById('reorder-btn');
   btn.disabled = true; btn.textContent = 'Submitting…';
@@ -613,7 +638,7 @@ async function submitReorder() {
       body: JSON.stringify({
         order_number: currentOrder.order_number,
         club: currentOrder.club,
-        print, colors, qty, notes
+        print, colors, qty: total, sizes, notes
       })
     });
     if (!res.ok) throw new Error('Failed to submit');
