@@ -186,16 +186,12 @@ async function sendResetEmail(email, token) {
 }
 
 async function sendReorderEmail(data) {
-  const sizeStr = data.sizes ? Object.entries(data.sizes).map(([k,v]) => `${v} ${k}`).join(', ') : data.qty;
   await sendEmail('mayor@mayorclothing.com', `Reorder Request — ${data.club}`,
     `<p><strong>Club:</strong> ${data.club}</p>
      <p><strong>Original order:</strong> ${data.order_number}</p>
-     <p><strong>Print:</strong> ${data.print}</p>
-     <p><strong>Colors:</strong> ${data.colors}</p>
-     <p><strong>Total quantity:</strong> ${data.qty}</p>
-     <p><strong>Size breakdown:</strong> ${sizeStr}</p>
-     <p><strong>Notes:</strong> ${data.notes || 'None'}</p>
-     <p><strong>Contact:</strong> ${data.email}</p>`
+     <p><strong>Contact:</strong> ${data.email}</p>
+     <p><strong>Notes:</strong></p>
+     <p style="white-space:pre-wrap;">${data.notes || 'No notes provided'}</p>`
   );
 }
 
@@ -386,8 +382,8 @@ router.get('/invoice/:order_number', requireAuth, async (req, res) => {
 // Reorder
 router.post('/reorder', requireAuth, async (req, res) => {
   try {
-    const { order_number, club, print, colors, qty, sizes, notes } = req.body;
-    await sendReorderEmail({ email: req.user.email, order_number, club, print, colors, qty, sizes, notes });
+    const { order_number, club, notes } = req.body;
+    await sendReorderEmail({ email: req.user.email, order_number, club, notes });
     res.json({ ok: true });
   } catch(e) {
     console.error('Reorder error:', e);
