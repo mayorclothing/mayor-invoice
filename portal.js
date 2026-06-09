@@ -316,6 +316,38 @@ router.get('/order-detail/:order_number', requireAuth, async (req, res) => {
   }
 });
 
+// Download order confirmation PDF
+router.get('/confirmation/:order_number', requireAuth, async (req, res) => {
+  try {
+    const orders = await getOrdersFromSheet(req.user.email);
+    const owned = orders.find(o => o.order_number === req.params.order_number);
+    if (!owned) return res.status(403).json({ error: 'Not authorized' });
+
+    const sheets = await getSheets();
+    const confRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'Order Confirmations!A:AK',
+    });
+    const confRow = (confRes.data.values || []).find(r => r[0] && r[0] === req.params.order_number);
+    if (!confRow) return res.status(404).json({ error: 'Order confirmation not available.' });
+
+    const confData = parseSheetRow(confRow);
+    const generateRes = await fetch('https://mayor-invoice.onrender.com/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...confData, type: 'confirmation', skip_logging: true })
+    });
+    if (!generateRes.ok) throw new Error('PDF generation failed: ' + await generateRes.text());
+    const buffer = Buffer.from(await generateRes.arrayBuffer());
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Mayor-Order-Confirmation-${req.params.order_number}.pdf"`);
+    res.send(buffer);
+  } catch(e) {
+    console.error('Confirmation download error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Download invoice PDF — only works if invoice exists
 router.get('/invoice/:order_number', requireAuth, async (req, res) => {
   try {
