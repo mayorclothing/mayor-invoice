@@ -40,6 +40,7 @@ async function appendOrderToSheet(data) {
       data.shipping || '', data.subtotal || '', data.embroidery || '', data.art_setup || '', data.total || '',
       get(3,'url'), get(3,'description'), get(3,'quantity'), get(3,'price'), get(3,'orig_price') || '',
       get(4,'url'), get(4,'description'), get(4,'quantity'), get(4,'price'), get(4,'orig_price') || '',
+      data.product_page || '',
     ];
 
     if (isConfirmation) {
@@ -92,9 +93,22 @@ async function appendOrderToSheet(data) {
   }
 }
 
-app.post('/generate', (req, res) => {
+app.post('/generate', async (req, res) => {
   try {
     const data = req.body;
+
+    // Pre-fetch product images as buffers
+    async function fetchImageBuffer(url) {
+      if (!url || !url.match(/\.(png|jpg|jpeg|webp)/i)) return null;
+      try {
+        const r = await fetch(url);
+        if (!r.ok) return null;
+        return Buffer.from(await r.arrayBuffer());
+      } catch(e) { return null; }
+    }
+    const imageBuffers = await Promise.all(
+      (data.line_items || []).map(item => fetchImageBuffer(item.url))
+    );
     const {
       order_number = '', club = '', address = '', ship_date = '',
       payment_link = '', w9_link = 'https://drive.google.com/file/d/1iZD_sP2WQbfPrXkHIcPqf7XawDMP2Zi1/view',
@@ -207,17 +221,27 @@ app.post('/generate', (req, res) => {
     line_items.forEach((item, i) => {
       // Normalize description - replace \n with actual newlines, keep spaces intact
       const descText = (item.description || '').replace(/\\n/g, '\n').replace(/ \/ /g, '\n');
+      const imgBuf = imageBuffers[i] || null;
+      const imgSize = 52; // thumbnail size in points
       const descH = doc.fontSize(8.5).heightOfString(descText, { width: dW - 8, lineGap: 1.5 });
       const hasDualPrice = item.orig_price && Number(item.orig_price) > 0;
-      const rowH = Math.max(descH + 14, hasDualPrice ? 40 : 26);
+      const rowH = Math.max(imgBuf ? imgSize + 10 : 0, descH + 14, hasDualPrice ? 40 : 26);
 
       if (i % 2 === 1) {
         doc.rect(rightX, ry, rightW, rowH).fill('#f9f9f8').fillColor('#1a1a18');
       }
       doc.rect(rightX, ry, rightW, rowH).lineWidth(0.4).stroke('#cccccc');
 
-      doc.fontSize(8.5).font('Times-Roman').fillColor('#1a1a18')
-         .text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url || '#' });
+      doc.fontSize(8.5).font('Times-Roman').fillColor('#1a1a18');
+      if (imgBuf) {
+        try {
+          doc.image(imgBuf, cP + 3, ry + 5, { width: imgSize, height: imgSize, link: item.url });
+        } catch(e) {
+          doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url || '#' });
+        }
+      } else {
+        doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url || '#' });
+      }
       doc.text(descText, cD + 3, ry + 7, { width: dW - 6, lineGap: 1.5 });
       doc.text(String(item.quantity || ''), cQ,  ry + 7, { width: qW,     align: 'right' });
       // Price column: show orig_price struck through above actual price (stacked)
