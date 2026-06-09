@@ -4,12 +4,11 @@ const PDFDocument = require('pdfkit');
 const { google } = require('googleapis');
 const cookieParser = require('cookie-parser');
 const path = require('path');
-const { router: portalRouter, sendSetupEmail, getOrdersFromSheet } = require('./portal');
+const { router: portalRouter, getOrdersFromSheet } = require('./portal');
 const app = express();
 
 app.use(cookieParser());
 app.use('/portal', portalRouter);
-app.get('/', (req, res) => res.redirect('/orders'));
 app.get('/mayor-logo.png', (req, res) => res.sendFile(path.join(__dirname, 'Mayor_Logo_transparent.png')));
 app.get('/orders', (req, res) => res.sendFile(path.join(__dirname, 'portal.html')));
 
@@ -25,24 +24,56 @@ async function appendOrderToSheet(data) {
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
     const sheets = google.sheets({ version: 'v4', auth });
+    // Check for duplicates before writing to Order Info
+    const existingRows = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'Order Info!A:A',
+    });
+    const existingOrders = (existingRows.data.values || []).map(r => r[0]);
+    if (!existingOrders.includes(data.order_number)) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID,
+        range: 'Order Info!A:H',
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [[
+            data.order_number || '',
+            data.customer_email || '',
+            data.club || '',
+            data.ship_date || '',
+            'Pending',
+            '', '', '',
+          ]]
+        }
+      });
+    }
+
+    // Write full invoice data to Invoices sheet
+    const items = data.line_items || [];
+    const get = (i, key) => items[i] ? (items[i][key] || '') : '';
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'Sheet1!A:H',
+      range: 'Invoices!A:AK',
       valueInputOption: 'USER_ENTERED',
       resource: {
         values: [[
           data.order_number || '',
           data.customer_email || '',
           data.club || '',
+          data.address || '',
           data.ship_date || '',
-          'Pending',
-          '', // Tracking Number — filled in manually
-          '', // Date Delivered — filled in manually
-          '', // Invoice Link — future use
+          data.payment_link || '',
+          get(0,'url'), get(0,'description'), get(0,'quantity'), get(0,'price'), get(0,'orig_price') || '',
+          get(1,'url'), get(1,'description'), get(1,'quantity'), get(1,'price'), get(1,'orig_price') || '',
+          get(2,'url'), get(2,'description'), get(2,'quantity'), get(2,'price'), get(2,'orig_price') || '',
+          data.shipping || '', data.subtotal || '', data.embroidery || '', data.art_setup || '', data.total || '',
+          get(3,'url'), get(3,'description'), get(3,'quantity'), get(3,'price'), get(3,'orig_price') || '',
+          get(4,'url'), get(4,'description'), get(4,'quantity'), get(4,'price'), get(4,'orig_price') || '',
         ]]
       }
     });
-    console.log('Order logged to sheet:', data.order_number);
+
+    console.log('Order logged to both sheets:', data.order_number);
   } catch(e) {
     console.error('Sheet write failed:', e.message);
   }
@@ -277,16 +308,7 @@ app.post('/generate', (req, res) => {
     // Log order to Google Sheet and send setup email for new customers (non-blocking)
     appendOrderToSheet(data).then(async () => {
       try {
-        const { sendSetupEmail, getOrdersFromSheet } = require('./portal');
-        const existing = await getOrdersFromSheet(data.customer_email || '');
-        // Only send setup email if this is their first order
-        if (data.customer_email && existing.length <= 1) {
-          const jwt = require('jsonwebtoken');
-          const JWT_SECRET = process.env.JWT_SECRET || 'mayor-portal-secret-change-in-prod';
-          const token = jwt.sign({ email: data.customer_email, action: 'setup' }, JWT_SECRET, { expiresIn: '24h' });
-          await sendSetupEmail(data.customer_email, data.club, token);
-          console.log('Setup email sent to', data.customer_email);
-        }
+        // Setup email removed — sent manually
       } catch(e) {
         console.error('Setup email error:', e.message);
       }
