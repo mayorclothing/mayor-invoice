@@ -7,83 +7,90 @@ const path = require('path');
 const { router: portalRouter, getOrdersFromSheet } = require('./portal');
 const app = express();
 
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use('/portal', portalRouter);
 app.get('/', (req, res) => res.redirect('/orders'));
 app.get('/mayor-logo.png', (req, res) => res.sendFile(path.join(__dirname, 'Mayor_Logo_transparent.png')));
 app.get('/orders', (req, res) => res.sendFile(path.join(__dirname, 'portal.html')));
 
-// Google Sheets setup
 const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
 const SHEET_CREDS = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT || '{}');
+const LOGO_PATH = __dirname + '/Mayor_Logo_transparent.png';
 
 async function appendOrderToSheet(data) {
   try {
-    if (!SHEET_CREDS.client_email) return; // skip if no creds configured
+    if (!SHEET_CREDS.client_email) return;
     const auth = new google.auth.GoogleAuth({
       credentials: SHEET_CREDS,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
     const sheets = google.sheets({ version: 'v4', auth });
-    // Check for duplicates before writing to Order Info
-    const existingRows = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: 'Order Info!A:A',
-    });
-    const existingOrders = (existingRows.data.values || []).map(r => r[0]);
-    if (!existingOrders.includes(data.order_number)) {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SHEET_ID,
-        range: 'Order Info!A:H',
-        valueInputOption: 'USER_ENTERED',
-        resource: {
-          values: [[
-            data.order_number || '',
-            data.customer_email || '',
-            data.club || '',
-            data.ship_date || '',
-            'Pending',
-            '', '', '',
-          ]]
-        }
-      });
-    }
+    const isConfirmation = data.type === 'confirmation';
 
-    // Write full invoice data to Invoices sheet
     const items = data.line_items || [];
     const get = (i, key) => items[i] ? (items[i][key] || '') : '';
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: 'Invoices!A:AK',
-      valueInputOption: 'USER_ENTERED',
-      resource: {
-        values: [[
-          data.order_number || '',
-          data.customer_email || '',
-          data.club || '',
-          data.address || '',
-          data.ship_date || '',
-          data.payment_link || '',
-          get(0,'url'), get(0,'description'), get(0,'quantity'), get(0,'price'), get(0,'orig_price') || '',
-          get(1,'url'), get(1,'description'), get(1,'quantity'), get(1,'price'), get(1,'orig_price') || '',
-          get(2,'url'), get(2,'description'), get(2,'quantity'), get(2,'price'), get(2,'orig_price') || '',
-          data.shipping || '', data.subtotal || '', data.embroidery || '', data.art_setup || '', data.total || '',
-          get(3,'url'), get(3,'description'), get(3,'quantity'), get(3,'price'), get(3,'orig_price') || '',
-          get(4,'url'), get(4,'description'), get(4,'quantity'), get(4,'price'), get(4,'orig_price') || '',
-        ]]
-      }
-    });
+    const rowData = [
+      data.order_number || '', data.customer_email || '', data.club || '',
+      data.address || '', data.ship_date || '', data.payment_link || '',
+      get(0,'url'), get(0,'description'), get(0,'quantity'), get(0,'price'), get(0,'orig_price') || '',
+      get(1,'url'), get(1,'description'), get(1,'quantity'), get(1,'price'), get(1,'orig_price') || '',
+      get(2,'url'), get(2,'description'), get(2,'quantity'), get(2,'price'), get(2,'orig_price') || '',
+      data.shipping || '', data.subtotal || '', data.embroidery || '', data.art_setup || '', data.total || '',
+      get(3,'url'), get(3,'description'), get(3,'quantity'), get(3,'price'), get(3,'orig_price') || '',
+      get(4,'url'), get(4,'description'), get(4,'quantity'), get(4,'price'), get(4,'orig_price') || '',
+    ];
 
-    console.log('Order logged to both sheets:', data.order_number);
+    if (isConfirmation) {
+      // Write to Order Info if new order
+      const existingRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:A' });
+      const existingOrders = (existingRows.data.values || []).map(r => r[0]);
+      if (!existingOrders.includes(data.order_number)) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SHEET_ID, range: 'Order Info!A:H', valueInputOption: 'USER_ENTERED',
+          resource: { values: [[data.order_number || '', data.customer_email || '', data.club || '', data.ship_date || '', 'Awaiting Approval', '', '', '']] }
+        });
+      }
+      // Overwrite or append Order Confirmations
+      const confRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Confirmations!A:A' });
+      const confData = confRows.data.values || [];
+      const confIdx = confData.findIndex(r => r[0] === data.order_number);
+      if (confIdx > 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID, range: `Order Confirmations!A${confIdx + 1}:AK${confIdx + 1}`,
+          valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
+        });
+        console.log('Order Confirmation updated:', data.order_number);
+      } else {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SHEET_ID, range: 'Order Confirmations!A:AK',
+          valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
+        });
+        console.log('Order Confirmation appended:', data.order_number);
+      }
+    } else {
+      // Invoice: append to Invoices sheet
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID, range: 'Invoices!A:AK',
+        valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
+      });
+      // Update Order Info status to Awaiting Payment
+      const orderRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:A' });
+      const orderData = orderRows.data.values || [];
+      const orderIdx = orderData.findIndex(r => r[0] === data.order_number);
+      if (orderIdx > 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID, range: `Order Info!E${orderIdx + 1}`,
+          valueInputOption: 'USER_ENTERED', resource: { values: [['Awaiting Payment']] }
+        });
+      }
+      console.log('Invoice logged, status updated to Awaiting Payment:', data.order_number);
+    }
   } catch(e) {
     console.error('Sheet write failed:', e.message);
   }
 }
-
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-
-const LOGO_PATH = __dirname + '/Mayor_Logo_transparent.png';
 
 app.post('/generate', (req, res) => {
   try {
@@ -106,8 +113,9 @@ app.post('/generate', (req, res) => {
     const contentW = pageW - margin * 2;
 
     // ── HEADER ──
+    const docTitle = data.type === 'confirmation' ? 'Order Confirmation' : 'Invoice';
     doc.fontSize(16).font('Times-Roman')
-       .text('Invoice', margin, margin, { align: 'center', width: contentW, characterSpacing: 3 });
+       .text(docTitle, margin, margin, { align: 'center', width: contentW, characterSpacing: 3 });
 
     // Logo - no border, just image
     try {
@@ -306,14 +314,8 @@ app.post('/generate', (req, res) => {
 
     doc.end();
 
-    // Log order to Google Sheet and send setup email for new customers (non-blocking)
-    if (!data.skip_logging) appendOrderToSheet(data).then(async () => {
-      try {
-        // Setup email removed — sent manually
-      } catch(e) {
-        console.error('Setup email error:', e.message);
-      }
-    });
+    // Log order to Google Sheet (non-blocking) — setup email sent manually
+    if (!data.skip_logging) appendOrderToSheet(data);
 
   } catch(e) {
     console.error(e);
