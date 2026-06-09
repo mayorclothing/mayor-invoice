@@ -539,10 +539,15 @@ async function showOrder(idx) {
     document.getElementById('detail-items-label').textContent =
       d.source === 'invoice' ? 'Order Details (Invoice)' : 'Order Details (Order Confirmation)';
 
-    // Update Order Info to include product page link if available
-    if (d.product_page) {
+    // Update Order Info to include product page and payment link if available
+    if (d.product_page || d.payment_link) {
       const infoEl = document.getElementById('detail-info');
-      infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Product Page</span><span class="detail-val"><a href="${d.product_page}" target="_blank" style="color:#1a1a18;">View Products</a></span></div>`;
+      if (d.product_page) {
+        infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Product Page</span><span class="detail-val"><a href="${d.product_page}" target="_blank" style="color:#1a1a18;">View Products</a></span></div>`;
+      }
+      if (d.payment_link) {
+        infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Payment</span><span class="detail-val"><a href="${d.payment_link}" target="_blank" style="color:#1a1a18;">Pay Invoice</a></span></div>`;
+      }
     }
 
     let html = '';
