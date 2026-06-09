@@ -269,7 +269,7 @@ router.get('/invoice/:order_number', requireAuth, async (req, res) => {
     const orders = await getOrdersFromSheet(req.user.email);
     const owned = orders.find(o => o.order_number === req.params.order_number);
     if (!owned) return res.status(403).json({ error: 'Not authorized' });
-    const generateRes = await fetch(`${BASE_URL}/generate`, {
+    const generateRes = await fetch('https://mayor-invoice.onrender.com/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...invoiceData, skip_logging: true })
