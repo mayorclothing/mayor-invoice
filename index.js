@@ -9,7 +9,6 @@ const app = express();
 
 app.use(cookieParser());
 app.use('/portal', portalRouter);
-app.get('/', (req, res) => res.redirect('/orders'));
 app.get('/mayor-logo.png', (req, res) => res.sendFile(path.join(__dirname, 'Mayor_Logo_transparent.png')));
 app.get('/orders', (req, res) => res.sendFile(path.join(__dirname, 'portal.html')));
 
@@ -307,7 +306,7 @@ app.post('/generate', (req, res) => {
     doc.end();
 
     // Log order to Google Sheet and send setup email for new customers (non-blocking)
-    appendOrderToSheet(data).then(async () => {
+    if (!data.skip_logging) appendOrderToSheet(data).then(async () => {
       try {
         // Setup email removed — sent manually
       } catch(e) {
