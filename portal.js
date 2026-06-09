@@ -135,6 +135,7 @@ function parseSheetRow(row) {
     embroidery:     Number(row[23]) || 0,
     art_setup:      Number(row[24]) || 0,
     total:          Number(row[25]) || 0,
+    product_page:   row[36] || '',
   };
 }
 
