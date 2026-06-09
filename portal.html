@@ -96,7 +96,7 @@
 <body>
 
 <nav>
-  <div class="nav-logo">Mayor</div>
+  <div class="nav-logo"><img src="/mayor-logo.png" alt="Mayor" style="height:36px;" /></div>
   <div class="nav-right" id="nav-right">
     <span id="nav-email"></span>
     <span id="nav-logout" style="display:none;"> · <a href="#" onclick="logout()">Sign out</a></span>
@@ -112,8 +112,14 @@
     </div>
     <div class="card">
       <div id="login-alert"></div>
-      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@yourclub.com" /></div>
-      <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" /></div>
+      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" /></div>
+      <div class="field">
+        <label>Password</label>
+        <div style="position:relative;">
+          <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:48px;" />
+          <span onclick="togglePw('login-password','toggle-login')" id="toggle-login" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:12px;">Show</span>
+        </div>
+      </div>
       <button class="btn" onclick="doLogin()" id="login-btn">Sign in</button>
       <div style="display:flex; justify-content:space-between; margin-top:12px; font-size:13px;">
         <a href="#" onclick="showForgot()" style="color:#888;">Forgot password?</a>
@@ -280,6 +286,13 @@ let currentOrders = [];
 let currentOrder = null;
 
 // ── PAGE ROUTING ──
+function togglePw(inputId, toggleId) {
+  const input = document.getElementById(inputId);
+  const toggle = document.getElementById(toggleId);
+  if (input.type === 'password') { input.type = 'text'; toggle.textContent = 'Hide'; }
+  else { input.type = 'password'; toggle.textContent = 'Show'; }
+}
+
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
