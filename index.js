@@ -290,10 +290,18 @@ app.post('/generate', async (req, res) => {
         try {
           doc.image(imgBuf, cP + 3, ry + 5, { width: imgSize, height: imgSize, link: item.url });
         } catch(e) {
-          doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url || '#' });
+          if (item.url) {
+            doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url });
+          } else {
+            doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: false });
+          }
         }
       } else {
-        doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url || '#' });
+        if (item.url) {
+          doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url });
+        } else {
+          doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: false });
+        }
       }
       doc.text(descText, cD + 3, ry + 7, { width: dW - 6, lineGap: 1.5 });
       doc.text(String(item.quantity || ''), cQ,  ry + 7, { width: qW,     align: 'right' });
