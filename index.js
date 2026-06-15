@@ -19,6 +19,32 @@ const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
 const SHEET_CREDS = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT || '{}');
 const LOGO_PATH = __dirname + '/Mayor_Logo_transparent.png';
 
+// Ensure a customer's email exists in the Users sheet (A=email, B=passwordHash, C=club)
+// so they're pre-registered and can later log in / set a password via the portal.
+async function upsertUserEmail(sheets, email, club) {
+  if (!email) return;
+  try {
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Users!A:C' });
+    const rows = res.data.values || [];
+    const idx = rows.findIndex(r => r[0] && r[0].toLowerCase() === email.toLowerCase());
+    if (idx === -1) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID, range: 'Users!A:C', valueInputOption: 'USER_ENTERED',
+        resource: { values: [[email, '', club || '']] }
+      });
+      console.log('Customer email added to Users sheet:', email);
+    } else if (!rows[idx][2] && club) {
+      // Existing user row but missing club — fill it in
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID, range: `Users!C${idx + 1}`, valueInputOption: 'USER_ENTERED',
+        resource: { values: [[club]] }
+      });
+    }
+  } catch(e) {
+    console.error('upsertUserEmail failed:', e.message);
+  }
+}
+
 async function appendOrderToSheet(data) {
   try {
     if (!SHEET_CREDS.client_email) return;
@@ -53,6 +79,9 @@ async function appendOrderToSheet(data) {
           resource: { values: [[data.order_number || '', data.customer_email || '', data.club || '', data.ship_date || '', 'Awaiting Approval', '', '', '']] }
         });
       }
+
+      // Make sure the customer's email is registered in the Users sheet
+      await upsertUserEmail(sheets, data.customer_email, data.club);
       // Overwrite or append Order Confirmations
       const confRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Confirmations!A:A' });
       const confData = confRows.data.values || [];
