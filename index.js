@@ -146,7 +146,7 @@ app.post('/generate', async (req, res) => {
     const {
       order_number = '', club = '', address = '', shipping_address = '', ship_date = '',
       date_label = 'Ship Date',
-      payment_link = '', w9_link = 'https://drive.google.com/file/d/1iZD_sP2WQbfPrXkHIcPqf7XawDMP2Zi1/view',
+      payment_link = '', payment_link_2 = '', w9_link = 'https://drive.google.com/file/d/1iZD_sP2WQbfPrXkHIcPqf7XawDMP2Zi1/view',
       line_items = [], subtotal = 0, embroidery, art_setup, strike_embroidery = true, strike_art = true,
       shipping = 0, sample_reimbursement = null, total = 0
     } = data;
@@ -230,18 +230,32 @@ app.post('/generate', async (req, res) => {
     doc.font('Times-Bold').text('Payment Terms:', margin, ly, { width: leftW });
     ly += 13;
 
-    const terms = isClub
-      ? 'Due on receipt. Based on our custom model, garments are produced specially for each club. Once clubs approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. '
-      : 'Due on receipt. Based on our custom model, garments are produced specially for each client. Once clients approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. ';
+    const isSplitPayment = !!(payment_link_2 && payment_link_2.trim());
+    const leadIn = isSplitPayment
+      ? '50% deposit, 50% on receipt. '
+      : 'Due on receipt. ';
+    const terms = leadIn + (isClub
+      ? 'Based on our custom model, garments are produced specially for each club. Once clubs approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. '
+      : 'Based on our custom model, garments are produced specially for each client. Once clients approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. ');
     doc.fontSize(8.5).font('Times-Roman').text(terms, margin, ly, { width: leftW, continued: true })
        .text('Here', { continued: true, underline: true, link: w9_link })
        .text(' is our W-9.', { underline: false });
     ly += doc.heightOfString(terms + 'Here is our W-9.', { width: leftW }) + 14;
 
-    doc.fontSize(9.5).font('Times-Bold').text('Payment Link:', margin, ly, { width: leftW });
-    ly += 13;
-    doc.fontSize(9).font('Times-Roman')
-       .text('Click Here', margin, ly, { link: payment_link || '#', underline: true, width: leftW });
+    if (isSplitPayment) {
+      doc.fontSize(9.5).font('Times-Bold').text('Payment Link:', margin, ly, { width: leftW });
+      ly += 13;
+      doc.fontSize(9).font('Times-Roman')
+         .text('50% Deposit', margin, ly, { link: payment_link || '#', underline: true, width: leftW });
+      ly += 14;
+      doc.fontSize(9).font('Times-Roman')
+         .text('50% on Receipt', margin, ly, { link: payment_link_2, underline: true, width: leftW });
+    } else {
+      doc.fontSize(9.5).font('Times-Bold').text('Payment Link:', margin, ly, { width: leftW });
+      ly += 13;
+      doc.fontSize(9).font('Times-Roman')
+         .text('Click Here', margin, ly, { link: payment_link || '#', underline: true, width: leftW });
+    }
 
     // ── RIGHT COLUMN — TABLE ──
     let ry = bodyY;
