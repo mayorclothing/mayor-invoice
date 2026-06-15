@@ -22,6 +22,13 @@ async function getSheets() {
   return google.sheets({ version: 'v4', auth });
 }
 
+// Order Info column B can contain multiple emails separated by commas/semicolons —
+// each registered customer should see the order if their email is anywhere in that list.
+function emailInList(cellValue, email) {
+  if (!cellValue) return false;
+  return cellValue.toLowerCase().split(/[,;]+/).map(s => s.trim()).includes(email.toLowerCase());
+}
+
 async function getOrdersFromSheet(email) {
   const sheets = await getSheets();
   const res = await sheets.spreadsheets.values.get({
@@ -30,7 +37,7 @@ async function getOrdersFromSheet(email) {
   });
   const rows = res.data.values || [];
   return rows.slice(1)
-    .filter(r => r[1] && r[1].toLowerCase() === email.toLowerCase())
+    .filter(r => emailInList(r[1], email))
     .map(r => ({
       order_number:    r[0] || '',
       email:           r[1] || '',
@@ -88,7 +95,7 @@ async function emailHasOrders(email) {
     range: 'Order Info!A:B',
   });
   const rows = res.data.values || [];
-  return rows.some(r => r[1] && r[1].toLowerCase() === email.toLowerCase());
+  return rows.some(r => emailInList(r[1], email));
 }
 
 // Parse row data (columns A-AK) into structured invoice/confirmation object
