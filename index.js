@@ -80,8 +80,13 @@ async function appendOrderToSheet(data) {
         });
       }
 
-      // Make sure the customer's email is registered in the Users sheet
-      await upsertUserEmail(sheets, data.customer_email, data.club);
+      // Make sure each customer's email is registered in the Users sheet (separate login per email)
+      const emails = (data.customer_emails && data.customer_emails.length)
+        ? data.customer_emails
+        : (data.customer_email || '').split(/[\n;,]+/).map(e => e.trim()).filter(Boolean);
+      for (const e of emails) {
+        await upsertUserEmail(sheets, e, data.club);
+      }
       // Overwrite or append Order Confirmations
       const confRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Confirmations!A:A' });
       const confData = confRows.data.values || [];
@@ -139,10 +144,11 @@ app.post('/generate', async (req, res) => {
       (data.line_items || []).map(item => fetchImageBuffer(item.url))
     );
     const {
-      order_number = '', club = '', address = '', ship_date = '',
+      order_number = '', club = '', address = '', shipping_address = '', ship_date = '',
+      date_label = 'Ship Date',
       payment_link = '', w9_link = 'https://drive.google.com/file/d/1iZD_sP2WQbfPrXkHIcPqf7XawDMP2Zi1/view',
       line_items = [], subtotal = 0, embroidery, art_setup, strike_embroidery = true, strike_art = true,
-      shipping = 0, total = 0
+      shipping = 0, sample_reimbursement = null, total = 0
     } = data;
 
     const doc = new PDFDocument({ size: 'LETTER', margin: 0 });
@@ -192,21 +198,34 @@ app.post('/generate', async (req, res) => {
     }
     ly += doc.heightOfString('Club: ' + club, { width: leftW }) + 10;
 
-    doc.font('Times-Bold').text('Shipping / Billing Address:', margin, ly, { width: leftW });
+    const hasShipping = shipping_address && shipping_address.trim() && shipping_address.trim() !== address.trim();
+
+    doc.font('Times-Bold').text(hasShipping ? 'Billing Address:' : 'Shipping / Billing Address:', margin, ly, { width: leftW });
     ly += 13;
 
-      // Split on newlines or commas; merge state/zip onto previous line
-      // Split address on newlines only — launcher handles the formatting
-      const addrLines = address.split(/\n/).map(s => s.trim()).filter(Boolean);
+    // Split on newlines or commas; merge state/zip onto previous line
+    // Split address on newlines only — launcher handles the formatting
+    const addrLines = address.split(/\n/).map(s => s.trim()).filter(Boolean);
     addrLines.forEach(line => {
       doc.font('Times-Roman').fontSize(9).text(line, margin, ly, { width: leftW });
       ly += 12;
     });
     ly += 8;
 
-    doc.fontSize(9.5).font('Times-Bold').text('Ship Date', margin, ly, { continued: true })
+    if (hasShipping) {
+      doc.font('Times-Bold').fontSize(9.5).text('Shipping Address:', margin, ly, { width: leftW });
+      ly += 13;
+      const shipLines = shipping_address.split(/\n/).map(s => s.trim()).filter(Boolean);
+      shipLines.forEach(line => {
+        doc.font('Times-Roman').fontSize(9).text(line, margin, ly, { width: leftW });
+        ly += 12;
+      });
+      ly += 8;
+    }
+
+    doc.fontSize(9.5).font('Times-Bold').text(date_label, margin, ly, { continued: true })
        .font('Times-Roman').text(': ' + ship_date, { width: leftW });
-    ly += doc.heightOfString('Ship Date: ' + ship_date, { width: leftW }) + 10;
+    ly += doc.heightOfString(date_label + ': ' + ship_date, { width: leftW }) + 10;
 
     doc.font('Times-Bold').text('Payment Terms:', margin, ly, { width: leftW });
     ly += 13;
@@ -356,6 +375,7 @@ app.post('/generate', async (req, res) => {
     if (embroidery) drawRow('Embroidery', '$' + Number(embroidery).toFixed(2), strike_embroidery);
     if (art_setup)  drawRow('Art Setup',  '$' + Number(art_setup).toFixed(2),  strike_art);
     drawRow('Shipping', '$' + Number(shipping).toFixed(0));
+    if (sample_reimbursement) drawRow('Sample Reimbursement', sample_reimbursement);
 
     // Total
     const totH = 18;
