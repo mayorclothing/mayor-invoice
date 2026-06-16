@@ -105,11 +105,23 @@ async function appendOrderToSheet(data) {
         console.log('Order Confirmation appended:', data.order_number);
       }
     } else {
-      // Invoice: append to Invoices sheet
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SHEET_ID, range: 'Invoices!A:AK',
-        valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
-      });
+      // Invoice: upsert to Invoices sheet (update if order number exists, append if new)
+      const invRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Invoices!A:A' });
+      const invData = invRows.data.values || [];
+      const invIdx = invData.findIndex(r => r[0] === data.order_number);
+      if (invIdx > 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID, range: `Invoices!A${invIdx + 1}:AK${invIdx + 1}`,
+          valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
+        });
+        console.log('Invoice updated:', data.order_number);
+      } else {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SHEET_ID, range: 'Invoices!A:AK',
+          valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
+        });
+        console.log('Invoice appended:', data.order_number);
+      }
       // Update Order Info status to Awaiting Payment
       const orderRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:A' });
       const orderData = orderRows.data.values || [];
