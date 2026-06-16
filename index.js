@@ -192,7 +192,7 @@ app.post('/generate', async (req, res) => {
     doc.font('Times-Bold').text(clubLabel, margin, ly, { continued: true })
        .font('Times-Roman').text(': ', { continued: true });
     if (data.product_page) {
-      doc.text(club, { width: leftW, link: data.product_page, underline: true });
+      doc.text(club, { width: leftW, underline: false });
     } else {
       doc.text(club, { width: leftW });
     }
@@ -302,20 +302,12 @@ app.post('/generate', async (req, res) => {
       doc.fontSize(8.5).font('Times-Roman').fillColor('#1a1a18');
       if (imgBuf) {
         try {
-          doc.image(imgBuf, cP + 3, ry + 5, { width: imgSize, height: imgSize, link: item.url });
+          doc.image(imgBuf, cP + 3, ry + 5, { width: imgSize, height: imgSize, link: data.product_page || '' });
         } catch(e) {
-          if (item.url) {
-            doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url });
-          } else {
-            doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: false });
-          }
-        }
-      } else {
-        if (item.url) {
-          doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: true, link: item.url });
-        } else {
           doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: false });
         }
+      } else {
+        doc.text(item.product || '', cP + 3, ry + 7, { width: pW - 6, underline: false });
       }
       doc.text(descText, cD + 3, ry + 7, { width: dW - 6, lineGap: 1.5 });
       doc.text(String(item.quantity || ''), cQ,  ry + 7, { width: qW,     align: 'right' });
