@@ -160,7 +160,8 @@ app.post('/generate', async (req, res) => {
       date_label = 'Ship Date',
       payment_link = '', payment_link_2 = '', w9_link = 'https://drive.google.com/file/d/1iZD_sP2WQbfPrXkHIcPqf7XawDMP2Zi1/view',
       line_items = [], subtotal = 0, embroidery, art_setup, strike_embroidery = true, strike_art = true,
-      shipping = 0, sample_reimbursement = null, total = 0
+      shipping = 0, strike_shipping = false, sample_reimbursement = null,
+      custom_label = null, payment_terms = '', total = 0
     } = data;
 
     const doc = new PDFDocument({ size: 'LETTER', margin: 0 });
@@ -243,16 +244,20 @@ app.post('/generate', async (req, res) => {
     ly += 13;
 
     const isSplitPayment = !!(payment_link_2 && payment_link_2.trim());
-    const leadIn = isSplitPayment
-      ? '50% deposit, 50% on receipt. '
-      : 'Due on receipt. ';
-    const terms = leadIn + (isClub
-      ? 'Based on our custom model, garments are produced specially for each club. Once clubs approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. '
-      : 'Based on our custom model, garments are produced specially for each client. Once clients approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. ');
-    doc.fontSize(8.5).font('Times-Roman').text(terms, margin, ly, { width: leftW, continued: true })
+    let termsText;
+    if (payment_terms && payment_terms.trim()) {
+      // Custom terms from the form — use verbatim, append W-9 reference
+      termsText = payment_terms.trim().replace(/\.$/, '') + '. Based on our custom model, garments are produced specially for each ' + (isClub ? 'club' : 'client') + '. Once ' + (isClub ? 'clubs' : 'clients') + ' approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. ';
+    } else {
+      const leadIn = isSplitPayment ? '50% deposit, 50% on receipt. ' : 'Due on receipt. ';
+      termsText = leadIn + (isClub
+        ? 'Based on our custom model, garments are produced specially for each club. Once clubs approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. '
+        : 'Based on our custom model, garments are produced specially for each client. Once clients approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. ');
+    }
+    doc.fontSize(8.5).font('Times-Roman').text(termsText, margin, ly, { width: leftW, continued: true })
        .text('Here', { continued: true, underline: true, link: w9_link })
        .text(' is our W-9.', { underline: false });
-    ly += doc.heightOfString(terms + 'Here is our W-9.', { width: leftW }) + 14;
+    ly += doc.heightOfString(termsText + 'Here is our W-9.', { width: leftW }) + 14;
 
     if (isSplitPayment) {
       doc.fontSize(9.5).font('Times-Bold').text('Payment Link:', margin, ly, { width: leftW });
@@ -399,8 +404,15 @@ app.post('/generate', async (req, res) => {
     ry += 17;
 
     if (embroidery) drawRow('Embroidery', '$' + Number(embroidery).toFixed(2), strike_embroidery);
-    if (art_setup)  drawRow('Art Setup',  '$' + Number(art_setup).toFixed(2),  strike_art);
-    drawRow('Shipping', '$' + Number(shipping).toFixed(0));
+    if (art_setup != null && art_setup !== 0) {
+      const artNum = Number(art_setup);
+      const artDisplay = artNum < 0
+        ? `($${Math.abs(artNum).toFixed(2)})`
+        : `$${artNum.toFixed(2)}`;
+      drawRow('Art Setup', artDisplay, strike_art);
+    }
+    if (custom_label) drawRow('Custom Main Label', '$' + Number(custom_label).toFixed(2));
+    drawRow('Shipping', '$' + Number(shipping).toFixed(0), strike_shipping);
     if (sample_reimbursement) drawRow('Sample Reimbursement', sample_reimbursement);
 
     // Total
