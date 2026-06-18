@@ -79,63 +79,64 @@ async function appendOrderToSheet(data) {
       data.sample_reimbursement || '',
     ];
 
+    // Helper: find next empty row in column A (after header), then write rowData there
+    async function writeToSheet(tabName, orderNumber, rowData) {
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tabName}!A:A` });
+      const col = res.data.values || [];
+      // Check if order already exists (skip row 0 which is header)
+      const existingIdx = col.findIndex((r, i) => i > 0 && String(r[0]) === String(orderNumber));
+      let targetRow;
+      if (existingIdx > 0) {
+        targetRow = existingIdx + 1; // 1-based
+        console.log(`${tabName} updating row ${targetRow} for:`, orderNumber);
+      } else {
+        // Find first row where column A is empty (after header row 1)
+        let firstEmpty = col.length + 1; // default: one past last row
+        for (let i = 1; i < col.length; i++) {
+          if (!col[i] || !col[i][0] || col[i][0].trim() === '') {
+            firstEmpty = i + 1; // 1-based
+            break;
+          }
+        }
+        targetRow = firstEmpty;
+        console.log(`${tabName} inserting row ${targetRow} for:`, orderNumber);
+      }
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: `${tabName}!A${targetRow}`,
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [rowData] }
+      });
+      return targetRow;
+    }
+
     if (isConfirmation) {
       // Write to Order Info if new order
       const existingRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:A' });
-      const existingOrders = (existingRows.data.values || []).map(r => r[0]);
-      if (!existingOrders.includes(data.order_number)) {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID, range: 'Order Info!A:H', valueInputOption: 'USER_ENTERED',
-          resource: { values: [[data.order_number || '', data.customer_email || '', data.club || '', data.ship_date || '', 'Awaiting Approval', '', '', '']] }
-        });
+      const existingOrders = (existingRows.data.values || []).map(r => String(r[0] || ''));
+      if (!existingOrders.includes(String(data.order_number))) {
+        await writeToSheet('Order Info',  data.order_number,
+          [data.order_number || '', data.customer_email || '', data.club || '',
+           data.ship_date || '', 'Awaiting Approval', '', '', '']);
       }
 
-      // Make sure each customer's email is registered in the Users sheet (separate login per email)
+      // Make sure each customer's email is registered in the Users sheet
       const emails = (data.customer_emails && data.customer_emails.length)
         ? data.customer_emails
         : (data.customer_email || '').split(/[\n;,]+/).map(e => e.trim()).filter(Boolean);
       for (const e of emails) {
         await upsertUserEmail(sheets, e, data.club);
       }
-      // Overwrite or append Order Confirmations
-      const confRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Confirmations!A:A' });
-      const confData = confRows.data.values || [];
-      const confIdx = confData.findIndex(r => r[0] === data.order_number);
-      if (confIdx > 0) {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: SHEET_ID, range: `Order Confirmations!A${confIdx + 1}:AU${confIdx + 1}`,
-          valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
-        });
-        console.log('Order Confirmation updated:', data.order_number);
-      } else {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID, range: 'Order Confirmations!A:AU',
-          valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
-        });
-        console.log('Order Confirmation appended:', data.order_number);
-      }
+
+      await writeToSheet('Order Confirmations', data.order_number, rowData);
+
     } else {
-      // Invoice: upsert to Invoices sheet (update if order number exists, append if new)
-      const invRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Invoices!A:A' });
-      const invData = invRows.data.values || [];
-      const invIdx = invData.findIndex(r => r[0] === data.order_number);
-      if (invIdx > 0) {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: SHEET_ID, range: `Invoices!A${invIdx + 1}:AU${invIdx + 1}`,
-          valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
-        });
-        console.log('Invoice updated:', data.order_number);
-      } else {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID, range: 'Invoices!A:AU',
-          valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
-        });
-        console.log('Invoice appended:', data.order_number);
-      }
+      await writeToSheet('Invoices', data.order_number, rowData);
+
       // Update Order Info status to Awaiting Payment
       const orderRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:A' });
       const orderData = orderRows.data.values || [];
-      const orderIdx = orderData.findIndex(r => r[0] === data.order_number);
+      const orderIdx = orderData.findIndex((r, i) => i > 0 && String(r[0]) === String(data.order_number));
       if (orderIdx > 0) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: SHEET_ID, range: `Order Info!E${orderIdx + 1}`,
