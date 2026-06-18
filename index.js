@@ -67,6 +67,16 @@ async function appendOrderToSheet(data) {
       get(3,'url'), get(3,'description'), get(3,'quantity'), get(3,'price'), get(3,'orig_price') || '',
       get(4,'url'), get(4,'description'), get(4,'quantity'), get(4,'price'), get(4,'orig_price') || '',
       data.product_page || '',
+      // AL=37 onward — new fields
+      data.shipping_address || '',
+      data.date_label || 'Ship Date',
+      data.payment_link_2 || '',
+      data.payment_terms || '',
+      data.strike_embroidery ? '1' : '',
+      data.strike_art ? '1' : '',
+      data.strike_shipping ? '1' : '',
+      data.custom_label || '',
+      data.sample_reimbursement || '',
     ];
 
     if (isConfirmation) {
@@ -93,13 +103,13 @@ async function appendOrderToSheet(data) {
       const confIdx = confData.findIndex(r => r[0] === data.order_number);
       if (confIdx > 0) {
         await sheets.spreadsheets.values.update({
-          spreadsheetId: SHEET_ID, range: `Order Confirmations!A${confIdx + 1}:AK${confIdx + 1}`,
+          spreadsheetId: SHEET_ID, range: `Order Confirmations!A${confIdx + 1}:AU${confIdx + 1}`,
           valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
         });
         console.log('Order Confirmation updated:', data.order_number);
       } else {
         await sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID, range: 'Order Confirmations!A:AK',
+          spreadsheetId: SHEET_ID, range: 'Order Confirmations!A:AU',
           valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
         });
         console.log('Order Confirmation appended:', data.order_number);
@@ -111,13 +121,13 @@ async function appendOrderToSheet(data) {
       const invIdx = invData.findIndex(r => r[0] === data.order_number);
       if (invIdx > 0) {
         await sheets.spreadsheets.values.update({
-          spreadsheetId: SHEET_ID, range: `Invoices!A${invIdx + 1}:AK${invIdx + 1}`,
+          spreadsheetId: SHEET_ID, range: `Invoices!A${invIdx + 1}:AU${invIdx + 1}`,
           valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
         });
         console.log('Invoice updated:', data.order_number);
       } else {
         await sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID, range: 'Invoices!A:AK',
+          spreadsheetId: SHEET_ID, range: 'Invoices!A:AU',
           valueInputOption: 'USER_ENTERED', resource: { values: [rowData] }
         });
         console.log('Invoice appended:', data.order_number);
