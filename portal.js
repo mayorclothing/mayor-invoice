@@ -98,7 +98,7 @@ async function emailHasOrders(email) {
   return rows.some(r => emailInList(r[1], email));
 }
 
-// Parse row data (columns A-AK) into structured invoice/confirmation object
+// Parse row data (columns A-AU) into structured invoice/confirmation object
 function parseSheetRow(row) {
   if (!row) return null;
   // Column mapping (0-indexed):
@@ -109,6 +109,10 @@ function parseSheetRow(row) {
   // V=21 Shipping, W=22 Subtotal, X=23 Embroidery, Y=24 ArtFee, Z=25 Total
   // AA=26 URL4, AB=27 Desc4, AC=28 Qty4, AD=29 Price4, AE=30 OrigPrice4
   // AF=31 URL5, AG=32 Desc5, AH=33 Qty5, AI=34 Price5, AJ=35 OrigPrice5
+  // AK=36 ProductPage
+  // AL=37 ShippingAddress, AM=38 DateLabel, AN=39 PaymentLink2
+  // AO=40 PaymentTerms, AP=41 StrikeEmb, AQ=42 StrikeArt, AR=43 StrikeShip
+  // AS=44 CustomLabel, AT=45 SampleReimbursement
   const itemOffsets = [
     [6,7,8,9,10], [11,12,13,14,15], [16,17,18,19,20],
     [26,27,28,29,30], [31,32,33,34,35]
@@ -130,19 +134,28 @@ function parseSheetRow(row) {
     }
   });
   return {
-    order_number:   row[0] || '',
-    customer_email: row[1] || '',
-    club:           row[2] || '',
-    address:        row[3] || '',
-    ship_date:      row[4] || '',
-    payment_link:   row[5] || '',
-    line_items:     items,
-    shipping:       Number(row[21]) || 0,
-    subtotal:       Number(row[22]) || 0,
-    embroidery:     Number(row[23]) || 0,
-    art_setup:      Number(row[24]) || 0,
-    total:          Number(row[25]) || 0,
-    product_page:   row[36] || '',
+    order_number:      row[0]  || '',
+    customer_email:    row[1]  || '',
+    club:              row[2]  || '',
+    address:           row[3]  || '',
+    ship_date:         row[4]  || '',
+    payment_link:      row[5]  || '',
+    line_items:        items,
+    shipping:          Number(row[21]) || 0,
+    subtotal:          Number(row[22]) || 0,
+    embroidery:        Number(row[23]) || 0,
+    art_setup:         row[24] || null,
+    total:             Number(row[25]) || 0,
+    product_page:      row[36] || '',
+    shipping_address:  row[37] || '',
+    date_label:        row[38] || 'Ship Date',
+    payment_link_2:    row[39] || '',
+    payment_terms:     row[40] || '',
+    strike_embroidery: row[41] === '1',
+    strike_art:        row[42] === '1',
+    strike_shipping:   row[43] === '1',
+    custom_label:      row[44] ? Number(row[44]) : null,
+    sample_reimbursement: row[45] || null,
   };
 }
 
@@ -153,7 +166,7 @@ async function getOrderDetailData(order_number) {
   // Try Invoices sheet first
   const invRes = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Invoices!A:AK',
+    range: 'Invoices!A:AU',
   });
   const invRows = invRes.data.values || [];
   const invRow = invRows.find(r => r[0] && r[0] === order_number);
@@ -162,7 +175,7 @@ async function getOrderDetailData(order_number) {
   // Fall back to Order Confirmations
   const confRes = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Order Confirmations!A:AK',
+    range: 'Order Confirmations!A:AU',
   });
   const confRows = confRes.data.values || [];
   const confRow = confRows.find(r => r[0] && r[0] === order_number);
