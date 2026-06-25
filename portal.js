@@ -99,6 +99,13 @@ async function emailHasOrders(email) {
 }
 
 // Parse row data (columns A-AU) into structured invoice/confirmation object
+// Parse a cell value that may be stored as "$1,776.00", "1776", "$NaN", etc.
+function parseCurrency(val) {
+  if (!val) return 0;
+  const n = parseFloat(String(val).replace(/[$,\s]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
 function parseSheetRow(row) {
   if (!row) return null;
   // Column mapping (0-indexed):
@@ -119,20 +126,24 @@ function parseSheetRow(row) {
   ];
   const items = [];
   itemOffsets.forEach(([ui, di, qi, pi, oi]) => {
-    if (row[qi] && Number(row[qi]) > 0) {
-      const qty   = Number(row[qi]) || 0;
-      const price = Number(row[pi]) || 0;
+    const qty   = parseCurrency(row[qi]);
+    const price = parseCurrency(row[pi]);
+    if (qty > 0) {
       items.push({
-        product:     'Custom Print Polo',
+        product:    'Custom Print Polo',
         url:        row[ui] || '',
         description: row[di] || '',
         quantity:   qty,
         price:      price,
-        orig_price: row[oi] ? Number(row[oi]) : null,
+        orig_price: row[oi] ? parseCurrency(row[oi]) : null,
         amount:     qty * price
       });
     }
   });
+
+  const artRaw = row[24] || null;
+  const artNum = artRaw ? parseCurrency(artRaw) : null;
+
   return {
     order_number:      row[0]  || '',
     customer_email:    row[1]  || '',
@@ -141,11 +152,11 @@ function parseSheetRow(row) {
     ship_date:         row[4]  || '',
     payment_link:      row[5]  || '',
     line_items:        items,
-    shipping:          Number(row[21]) || 0,
-    subtotal:          Number(row[22]) || 0,
-    embroidery:        Number(row[23]) || 0,
-    art_setup:         row[24] || null,
-    total:             Number(row[25]) || 0,
+    shipping:          parseCurrency(row[21]),
+    subtotal:          parseCurrency(row[22]),
+    embroidery:        parseCurrency(row[23]),
+    art_setup:         artNum,
+    total:             parseCurrency(row[25]),
     product_page:      row[36] || '',
     shipping_address:  row[37] || '',
     date_label:        row[38] || 'Ship Date',
@@ -154,7 +165,7 @@ function parseSheetRow(row) {
     strike_embroidery: row[41] === '1',
     strike_art:        row[42] === '1',
     strike_shipping:   row[43] === '1',
-    custom_label:      row[44] ? Number(row[44]) : null,
+    custom_label:      row[44] ? parseCurrency(row[44]) : null,
     sample_reimbursement: row[45] || null,
   };
 }
