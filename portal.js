@@ -162,9 +162,9 @@ function parseSheetRow(row) {
     date_label:        row[38] || 'Ship Date',
     payment_link_2:    row[39] || '',
     payment_terms:     row[40] || '',
-    strike_embroidery: row[41] === '1',
-    strike_art:        row[42] === '1',
-    strike_shipping:   row[43] === '1',
+    strike_embroidery: row[41] !== undefined && row[41] !== '' ? row[41] === '1' : true,
+    strike_art:        row[42] !== undefined && row[42] !== '' ? row[42] === '1' : true,
+    strike_shipping:   row[43] !== undefined && row[43] !== '' ? row[43] === '1' : false,
     custom_label:      row[44] ? parseCurrency(row[44]) : null,
     sample_reimbursement: row[45] || null,
   };
