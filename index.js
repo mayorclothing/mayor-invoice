@@ -403,15 +403,18 @@ app.post('/generate', async (req, res) => {
       ry += rH;
     };
 
-    // Subtotal row — qty total on left side of subtotal label
+    // Subtotal row — recalculate from line items if subtotal wasn't passed correctly
+    const calcSubtotal = line_items.reduce((s, i) => s + (parseFloat(String(i.amount).replace(/[$,]/g,'')) || (Number(i.quantity) * Number(i.price)) || 0), 0);
+    const effectiveSubtotal = subtotal && Number(subtotal) > 0 ? Number(subtotal) : calcSubtotal;
+    const effectiveTotal = total && Number(total) > 0 ? Number(total) : effectiveSubtotal + Number(shipping || 0);
+
     const qtyTotal = line_items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
     doc.rect(rightX, ry, rightW, 17).lineWidth(0.4).stroke('#cccccc');
     doc.fontSize(8.5).font('Times-Bold').fillColor('#1a1a18')
-       // "Subtotal" label moved left to sit under Description col
        .text('Subtotal', cD, ry + 5, { width: dW, align: 'right' });
     doc.font('Times-Roman')
        .text(String(qtyTotal), cQ, ry + 5, { width: qW, align: 'right' })
-       .text('$' + Number(subtotal).toFixed(2), cA, ry + 5, { width: aW - 2, align: 'right' });
+       .text('$' + effectiveSubtotal.toFixed(2), cA, ry + 5, { width: aW - 2, align: 'right' });
     ry += 17;
 
     if (embroidery) drawRow('Embroidery', '$' + Number(embroidery).toFixed(2), strike_embroidery);
@@ -433,7 +436,7 @@ app.post('/generate', async (req, res) => {
     doc.rect(rightX, ry, rightW, totH).lineWidth(0.4).stroke('#cccccc');
     doc.fontSize(9).font('Times-Bold').fillColor('#1a1a18')
        .text('Total', cPr - 55, ry + 5, { width: 55 + prW, align: 'right' })
-       .text('$' + Number(total).toFixed(2), cA, ry + 5, { width: aW - 2, align: 'right' });
+       .text('$' + effectiveTotal.toFixed(2), cA, ry + 5, { width: aW - 2, align: 'right' });
 
     // ── FOOTER ──
     doc.moveTo(margin, pageH - 38).lineTo(pageW - margin, pageH - 38).lineWidth(0.75).stroke();
