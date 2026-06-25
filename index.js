@@ -63,7 +63,7 @@ async function appendOrderToSheet(data) {
       get(0,'url'), get(0,'description'), get(0,'quantity'), get(0,'price'), get(0,'orig_price') || '',
       get(1,'url'), get(1,'description'), get(1,'quantity'), get(1,'price'), get(1,'orig_price') || '',
       get(2,'url'), get(2,'description'), get(2,'quantity'), get(2,'price'), get(2,'orig_price') || '',
-      data.shipping || '', data.subtotal || '', data.embroidery || '', data.art_setup || '', data.total || '',
+      data.shipping || '', data.subtotal || '', data.embroidery || '', (art_setup != null ? parseFloat(String(art_setup).replace(/[$,\s]/g,'')) || '' : ''), data.total || '',
       get(3,'url'), get(3,'description'), get(3,'quantity'), get(3,'price'), get(3,'orig_price') || '',
       get(4,'url'), get(4,'description'), get(4,'quantity'), get(4,'price'), get(4,'orig_price') || '',
       data.product_page || '',
@@ -415,12 +415,14 @@ app.post('/generate', async (req, res) => {
     ry += 17;
 
     if (embroidery) drawRow('Embroidery', '$' + Number(embroidery).toFixed(2), strike_embroidery);
-    if (art_setup != null && art_setup !== 0) {
-      const artNum = Number(art_setup);
-      const artDisplay = artNum < 0
-        ? `($${Math.abs(artNum).toFixed(2)})`
-        : `$${artNum.toFixed(2)}`;
-      drawRow('Art Setup', artDisplay, strike_art);
+    if (art_setup != null && art_setup !== 0 && art_setup !== '') {
+      const artNum = parseFloat(String(art_setup).replace(/[$,\s]/g, ''));
+      if (!isNaN(artNum) && artNum !== 0) {
+        const artDisplay = artNum < 0
+          ? `($${Math.abs(artNum).toFixed(2)})`
+          : `$${artNum.toFixed(2)}`;
+        drawRow('Art Setup', artDisplay, strike_art);
+      }
     }
     if (custom_label) drawRow('Custom Main Label', '$' + Number(custom_label).toFixed(2));
     drawRow('Shipping', '$' + Number(shipping).toFixed(0), strike_shipping);
