@@ -562,15 +562,18 @@ async function showOrder(idx) {
       </div>`;
     });
 
-    // Totals section
+    // Totals section. Art and embroidery are struck through ONLY when their strike flag
+    // is set; when not struck they're real charges included in the total. Art can be a
+    // credit (negative), shown as ($x). d.total is authoritative for the Total line.
     const strikeStyle = 'text-decoration:line-through; color:#aaa;';
     const artVal   = Number(d.art_setup) || 0;
     const embVal   = Number(d.embroidery) || 0;
-    const artHTML  = artVal > 0
-      ? `<span style="${strikeStyle}">${fmtMoney(artVal)}</span>`
+    const fmtSigned = (v) => v < 0 ? `(${fmtMoney(Math.abs(v))})` : fmtMoney(v);
+    const artHTML  = artVal !== 0
+      ? (d.strike_art ? `<span style="${strikeStyle}">${fmtSigned(artVal)}</span>` : fmtSigned(artVal))
       : fmtMoney(0);
     const embHTML  = embVal > 0
-      ? `<span style="${strikeStyle}">${fmtMoney(embVal)}</span>`
+      ? (d.strike_embroidery ? `<span style="${strikeStyle}">${fmtMoney(embVal)}</span>` : fmtMoney(embVal))
       : fmtMoney(0);
 
     const totRow = (label, val, bold=false) =>
