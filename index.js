@@ -7,7 +7,21 @@ const path = require('path');
 const { router: portalRouter, getOrdersFromSheet } = require('./portal');
 const app = express();
 
-app.use(cors());
+// Restrict cross-origin requests to Mayor's own front-ends. The invoice generator
+// (GitHub Pages) and the orders portal POST here from the browser; everything else
+// is blocked. Add new front-end origins to this list if they're introduced.
+const ALLOWED_ORIGINS = [
+  'https://mayorclothing.github.io',
+  'https://orders.mayorclothing.com',
+  'https://mayor-invoice.onrender.com',
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow same-origin / non-browser requests (no Origin header) and allowlisted origins.
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(null, false);
+  },
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use('/portal', portalRouter);
