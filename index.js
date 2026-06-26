@@ -420,7 +420,25 @@ app.post('/generate', async (req, res) => {
     // Subtotal row — recalculate from line items if subtotal wasn't passed correctly
     const calcSubtotal = line_items.reduce((s, i) => s + (parseFloat(String(i.amount).replace(/[$,]/g,'')) || (Number(i.quantity) * Number(i.price)) || 0), 0);
     const effectiveSubtotal = subtotal && Number(subtotal) > 0 ? Number(subtotal) : calcSubtotal;
-    const effectiveTotal = total && Number(total) > 0 ? Number(total) : effectiveSubtotal + Number(shipping || 0);
+    // Fallback total (only used if a total wasn't passed). Mirrors the generator's rule:
+    // shipping, custom label, and non-struck embroidery/art are added; struck fees and
+    // the sample reimbursement credit are excluded/subtracted. Art keeps its sign.
+    // num() preserves a leading minus sign so art credits stay negative.
+    const num = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(/[$,()\s]/g, '')); return isNaN(n) ? 0 : n; };
+    const artSigned = (v) => {
+      const s = String(v == null ? '' : v).trim();
+      const magnitude = num(s);
+      // Negative if explicitly signed "-" or wrapped in accounting parentheses "(...)"
+      return (s.startsWith('-') || s.startsWith('(')) ? -Math.abs(magnitude) : magnitude;
+    };
+    const embForTotal = strike_embroidery ? 0 : num(embroidery);
+    const artForTotal = strike_art ? 0 : artSigned(art_setup);
+    const shipForTotal = strike_shipping ? 0 : num(shipping);
+    const reimbForTotal = num(sample_reimbursement); // stored as "(x)" credit
+    const customForTotal = num(custom_label);
+    const effectiveTotal = total && Number(total) > 0
+      ? Number(total)
+      : effectiveSubtotal + shipForTotal + customForTotal + embForTotal + artForTotal - reimbForTotal;
 
     const qtyTotal = line_items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
     doc.rect(rightX, ry, rightW, 17).lineWidth(0.4).stroke('#cccccc');
