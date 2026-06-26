@@ -8,7 +8,12 @@ const router = express.Router();
 router.use(express.json());
 
 const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
+// JWT_SECRET must be set in the environment. The fallback exists only for local dev;
+// if it is ever used while NODE_ENV=production, log a loud warning so it gets caught.
 const JWT_SECRET = process.env.JWT_SECRET || 'mayor-portal-secret-change-in-prod';
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('SECURITY WARNING: JWT_SECRET is not set in production — sessions are signed with a public default. Set the JWT_SECRET env var on Render.');
+}
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const BASE_URL = process.env.BASE_URL || 'https://orders.mayorclothing.com';
 
