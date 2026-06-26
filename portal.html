@@ -469,6 +469,14 @@ function fmtMoney(n) {
   return '$' + Number(n).toFixed(2);
 }
 
+// Parse a value that may be stored as "$1,776.00", "(250.00)", "1776", "", null, etc.
+// Parentheses (accounting-style credits) and "$"/commas are stripped; result is always a number.
+function parseCurrency(val) {
+  if (val === null || val === undefined || val === '') return 0;
+  const n = parseFloat(String(val).replace(/[$,()\s]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
 async function showOrder(idx) {
   currentOrder = currentOrders[idx];
   const o = currentOrder;
@@ -568,11 +576,22 @@ async function showOrder(idx) {
     const totRow = (label, val, bold=false) =>
       `<div class="detail-row"><span class="detail-key" ${bold?'style="font-weight:600;"':''}>${label}</span><span class="detail-val" ${bold?'style="font-weight:600;"':''}>${val}</span></div>`;
 
+    // Custom Main Label (added to total) and Sample Reimbursement (a credit, subtracted).
+    // These must appear here so Subtotal + Shipping + Custom Label - Reimbursement = Total.
+    const customLabelVal = Number(d.custom_label) || 0;
+    const reimbAmt = parseCurrency(d.sample_reimbursement); // strips "$", commas, and "( )"
+    const customLabelRow = customLabelVal > 0 ? totRow('Custom Main Label', fmtMoney(customLabelVal)) : '';
+    const reimbRow = reimbAmt > 0
+      ? totRow('Sample Reimbursement', `(${fmtMoney(reimbAmt)})`)
+      : '';
+
     html += `<div style="margin-top:12px;">
       ${totRow('Art Fee', artHTML)}
       ${totRow('Embroidery', embHTML)}
       ${totRow('Subtotal', fmtMoney(d.subtotal))}
+      ${customLabelRow}
       ${totRow('Shipping', fmtMoney(d.shipping))}
+      ${reimbRow}
       ${totRow('Total', fmtMoney(d.total), true)}
     </div>`;
 
