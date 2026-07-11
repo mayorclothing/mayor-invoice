@@ -17,6 +17,17 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const BASE_URL = process.env.BASE_URL || 'https://orders.mayorclothing.com';
 
+// Admin users see EVERY order (Matt's all-orders view), not just their own.
+// Admin = email listed in PORTAL_ADMIN_EMAILS, or a Users-row whose club is "ADMIN".
+const ADMIN_EMAILS = (process.env.PORTAL_ADMIN_EMAILS || 'mayor@mayorclothing.com')
+  .toLowerCase().split(/[,;]+/).map((sV) => sV.trim()).filter(Boolean);
+function isAdminUser(user) {
+  if (!user) return false;
+  if (ADMIN_EMAILS.includes(String(user.email || '').toLowerCase())) return true;
+  if (String(user.club || '').trim().toLowerCase() === 'admin') return true;
+  return false;
+}
+
 // ── GOOGLE SHEETS ──
 async function getSheets() {
   const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT || '{}');
@@ -43,6 +54,27 @@ async function getOrdersFromSheet(email) {
   const rows = res.data.values || [];
   return rows.slice(1)
     .filter(r => emailInList(r[1], email))
+    .map(r => ({
+      order_number:    r[0] || '',
+      email:           r[1] || '',
+      club:            r[2] || '',
+      ship_date:       r[3] || '',
+      status:          r[4] || 'Awaiting Approval',
+      tracking_number: r[5] || '',
+      date_delivered:  r[6] || '',
+    }));
+}
+
+// Every order in the sheet — used for the admin (all-orders) view.
+async function getAllOrdersFromSheet() {
+  const sheets = await getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: 'Order Info!A:H',
+  });
+  const rows = res.data.values || [];
+  return rows.slice(1)
+    .filter(r => r[0])
     .map(r => ({
       order_number:    r[0] || '',
       email:           r[1] || '',
@@ -257,9 +289,10 @@ router.post('/login', async (req, res) => {
     if (!user || !user.passwordHash) return res.status(401).json({ error: 'Invalid email or password' });
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
-    const token = jwt.sign({ email: user.email, club: user.club }, JWT_SECRET, { expiresIn: '7d' });
+    const admin = isAdminUser(user);
+    const token = jwt.sign({ email: user.email, club: user.club, admin }, JWT_SECRET, { expiresIn: '7d' });
     res.cookie('mayor_token', token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7*24*60*60*1000 });
-    res.json({ email: user.email, club: user.club });
+    res.json({ email: user.email, club: user.club, admin });
   } catch(e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Server error' });
@@ -327,8 +360,8 @@ router.post('/create-account', async (req, res) => {
 // Get orders list
 router.get('/orders', requireAuth, async (req, res) => {
   try {
-    const orders = await getOrdersFromSheet(req.user.email);
-    res.json({ orders });
+    const orders = req.user.admin ? await getAllOrdersFromSheet() : await getOrdersFromSheet(req.user.email);
+    res.json({ orders, admin: !!req.user.admin });
   } catch(e) {
     console.error('Orders error:', e);
     res.status(500).json({ error: 'Could not load orders' });
@@ -338,9 +371,10 @@ router.get('/orders', requireAuth, async (req, res) => {
 // Get full order detail (confirmation or invoice data)
 router.get('/order-detail/:order_number', requireAuth, async (req, res) => {
   try {
-    const orders = await getOrdersFromSheet(req.user.email);
-    const owned = orders.find(o => o.order_number === req.params.order_number);
-    if (!owned) return res.status(403).json({ error: 'Not authorized' });
+    if (!req.user.admin) {
+      const orders = await getOrdersFromSheet(req.user.email);
+      if (!orders.find(o => o.order_number === req.params.order_number)) return res.status(403).json({ error: 'Not authorized' });
+    }
     const detail = await getOrderDetailData(req.params.order_number);
     if (!detail) return res.status(404).json({ error: 'Order details not available yet' });
     res.json(detail);
@@ -353,9 +387,10 @@ router.get('/order-detail/:order_number', requireAuth, async (req, res) => {
 // Download order confirmation PDF
 router.get('/confirmation/:order_number', requireAuth, async (req, res) => {
   try {
-    const orders = await getOrdersFromSheet(req.user.email);
-    const owned = orders.find(o => o.order_number === req.params.order_number);
-    if (!owned) return res.status(403).json({ error: 'Not authorized' });
+    if (!req.user.admin) {
+      const orders = await getOrdersFromSheet(req.user.email);
+      if (!orders.find(o => o.order_number === req.params.order_number)) return res.status(403).json({ error: 'Not authorized' });
+    }
 
     const sheets = await getSheets();
     const confRes = await sheets.spreadsheets.values.get({
@@ -385,9 +420,10 @@ router.get('/confirmation/:order_number', requireAuth, async (req, res) => {
 // Download invoice PDF — only works if invoice exists
 router.get('/invoice/:order_number', requireAuth, async (req, res) => {
   try {
-    const orders = await getOrdersFromSheet(req.user.email);
-    const owned = orders.find(o => o.order_number === req.params.order_number);
-    if (!owned) return res.status(403).json({ error: 'Not authorized' });
+    if (!req.user.admin) {
+      const orders = await getOrdersFromSheet(req.user.email);
+      if (!orders.find(o => o.order_number === req.params.order_number)) return res.status(403).json({ error: 'Not authorized' });
+    }
 
     // Only generate PDF from Invoices sheet (not confirmations)
     const sheets = await getSheets();
