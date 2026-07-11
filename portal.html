@@ -318,7 +318,7 @@ async function doLogin() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Login failed');
-    currentUser = { email: data.email, club: data.club };
+    currentUser = { email: data.email, club: data.club, admin: !!data.admin };
     document.getElementById('nav-email').textContent = data.email;
     document.getElementById('nav-logout').style.display = '';
     loadOrders();
@@ -414,7 +414,8 @@ function logout() {
 // ── ORDERS ──
 async function loadOrders() {
   showPage('orders');
-  document.getElementById('orders-club-name').textContent = currentUser.club || '';
+  const _h1 = document.querySelector('#page-orders h1'); if (_h1) _h1.textContent = currentUser.admin ? 'All Orders' : 'Your Orders';
+  document.getElementById('orders-club-name').textContent = currentUser.admin ? 'Admin view — all orders' : (currentUser.club || '');
   const list = document.getElementById('orders-list');
   list.innerHTML = '<p style="color:#888; font-size:13px;">Loading…</p>';
 
@@ -423,6 +424,7 @@ async function loadOrders() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     currentOrders = data.orders || [];
+    if (currentUser.admin) document.getElementById('orders-club-name').textContent = currentOrders.length + ' orders (admin view)';
     if (!currentOrders.length) {
       list.innerHTML = '<p style="color:#888; font-size:13px;">No orders found.</p>';
       return;
@@ -431,7 +433,7 @@ async function loadOrders() {
       <div class="order-row" onclick="showOrder(${i})">
         <div>
           <div class="order-title">${o.order_number}</div>
-          <div class="order-meta">${o.club} · ${o.ship_date}</div>
+          <div class="order-meta">${o.club}${currentUser.admin && o.email ? ' · ' + o.email : ''} · ${o.ship_date}</div>
         </div>
         <div class="order-right">
           <span class="badge badge-${(o.status||'pending').toLowerCase()}">${o.status || 'Pending'}</span>
