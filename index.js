@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const { router: portalRouter, getOrdersFromSheet } = require('./portal');
 const app = express();
+app.set('trust proxy', 1);
 
 // Restrict cross-origin requests to Mayor's own front-ends. The invoice generator
 // (GitHub Pages) and the orders portal POST here from the browser; everything else
@@ -33,6 +34,27 @@ const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
 const SHEET_CREDS = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT || '{}');
 const LOGO_PATH = __dirname + '/Mayor_Logo_transparent.png';
 
+// ---- /generate hardening (this endpoint is browser-reachable and writes to the sheet) ----
+function sheetSafe(v) { if (typeof v !== 'string') return v; return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v; }
+// Payment links must be on a trusted host (blocks payment-link fraud). Extend as needed.
+const TRUSTED_PAYMENT_HOSTS = (process.env.TRUSTED_PAYMENT_HOSTS || 'nickelpayments.com,mayorclothing.com')
+  .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+function trustedPaymentLink(u) {
+  try { const url = new URL(String(u)); if (url.protocol !== 'https:') return '';
+    const host = url.hostname.toLowerCase();
+    return TRUSTED_PAYMENT_HOSTS.some((h) => host === h || host.endsWith('.' + h)) ? url.toString() : '';
+  } catch (e) { return ''; }
+}
+function httpsUrlOrEmpty(u) { try { const url = new URL(String(u)); return url.protocol === 'https:' ? url.toString() : ''; } catch (e) { return ''; } }
+function sanitizeGeneratePayload(data) {
+  const d = { ...(data || {}) };
+  d.payment_link = trustedPaymentLink(d.payment_link);
+  d.payment_link_2 = trustedPaymentLink(d.payment_link_2);
+  d.product_page = httpsUrlOrEmpty(d.product_page);
+  d.line_items = (Array.isArray(d.line_items) ? d.line_items : []).slice(0, 10).map((it) => ({ ...(it || {}), url: httpsUrlOrEmpty(it && it.url) }));
+  return d;
+}
+
 // Ensure a customer's email exists in the Users sheet (A=email, B=passwordHash, C=club)
 // so they're pre-registered and can later log in / set a password via the portal.
 async function upsertUserEmail(sheets, email, club) {
@@ -44,7 +66,7 @@ async function upsertUserEmail(sheets, email, club) {
     if (idx === -1) {
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID, range: 'Users!A:C', valueInputOption: 'USER_ENTERED',
-        resource: { values: [[email, '', club || '']] }
+        resource: { values: [[email, '', club || ''].map(v => (typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? `'${v}` : v))] }
       });
       console.log('Customer email added to Users sheet:', email);
     } else if (!rows[idx][2] && club) {
@@ -119,7 +141,7 @@ async function appendOrderToSheet(data) {
         spreadsheetId: SHEET_ID,
         range: `${tabName}!A${targetRow}`,
         valueInputOption: 'USER_ENTERED',
-        resource: { values: [rowData] }
+        resource: { values: [rowData.map(sheetSafe)] }
       });
       return targetRow;
     }
@@ -131,7 +153,7 @@ async function appendOrderToSheet(data) {
       if (!existingOrders.includes(String(data.order_number))) {
         await writeToSheet('Order Info',  data.order_number,
           [data.order_number || '', data.customer_email || '', data.club || '',
-           data.ship_date || '', 'Awaiting Approval', '', '', '']);
+           data.ship_date || '', 'Awaiting Approval', '', '', ''].map(sheetSafe));
       }
 
       // Make sure each customer's email is registered in the Users sheet
@@ -166,7 +188,7 @@ async function appendOrderToSheet(data) {
 
 app.post('/generate', async (req, res) => {
   try {
-    const data = req.body;
+    const data = sanitizeGeneratePayload(req.body);
 
     const pdf = await renderInvoicePdf(data);
     res.setHeader('Content-Type', 'application/pdf');
