@@ -13,12 +13,27 @@ const path = require('path');
 const DEFAULT_LOGO_PATH = path.join(__dirname, 'Mayor_Logo_transparent.png');
 const DEFAULT_W9 = 'https://drive.google.com/file/d/1iZD_sP2WQbfPrXkHIcPqf7XawDMP2Zi1/view';
 
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const IMAGE_FETCH_TIMEOUT_MS = 8000;
+
 async function fetchImageBuffer(url) {
-  if (!url || !url.match(/\.(png|jpg|jpeg|webp)/i)) return null;
+  // Only fetch https image URLs whose path ends in an allowed extension. Blocks
+  // SSRF (no http/internal-metadata targets, no redirects) with a timeout + size cap.
+  if (typeof url !== 'string') return null;
+  let parsed;
+  try { parsed = new URL(url); } catch (e) { return null; }
+  if (parsed.protocol !== 'https:') return null;
+  if (!/\.(png|jpe?g|webp)$/i.test(parsed.pathname)) return null;
   try {
-    const r = await fetch(url);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
+    const r = await fetch(url, { signal: controller.signal, redirect: 'error' });
+    clearTimeout(timer);
     if (!r.ok) return null;
-    return Buffer.from(await r.arrayBuffer());
+    const len = Number(r.headers.get('content-length') || 0);
+    if (len && len > MAX_IMAGE_BYTES) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    return buf.length > MAX_IMAGE_BYTES ? null : buf;
   } catch (e) { return null; }
 }
 
