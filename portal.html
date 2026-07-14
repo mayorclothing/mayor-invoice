@@ -412,6 +412,9 @@ function logout() {
 }
 
 // ── ORDERS ──
+function esc(v) { return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function safeUrl(u) { try { const url = new URL(String(u)); return url.protocol === 'https:' ? url.href : ''; } catch (e) { return ''; } }
+function badgeClass(status) { return 'badge-' + String(status || 'pending').toLowerCase().replace(/[^a-z]/g, ''); }
 async function loadOrders() {
   showPage('orders');
   const _h1 = document.querySelector('#page-orders h1'); if (_h1) _h1.textContent = currentUser.admin ? 'All Orders' : 'Your Orders';
@@ -432,11 +435,11 @@ async function loadOrders() {
     list.innerHTML = currentOrders.map((o, i) => `
       <div class="order-row" onclick="showOrder(${i})">
         <div>
-          <div class="order-title">${o.order_number}</div>
-          <div class="order-meta">${o.club}${currentUser.admin && o.email ? ' · ' + o.email : ''} · ${o.ship_date}</div>
+          <div class="order-title">${esc(o.order_number)}</div>
+          <div class="order-meta">${esc(o.club)}${currentUser.admin && o.email ? ' · ' + esc(o.email) : ''} · ${esc(o.ship_date)}</div>
         </div>
         <div class="order-right">
-          <span class="badge badge-${(o.status||'pending').toLowerCase()}">${o.status || 'Pending'}</span>
+          <span class="badge ${badgeClass(o.status)}">${esc(o.status || 'Pending')}</span>
         </div>
       </div>`).join('');
   } catch(e) {
@@ -499,14 +502,14 @@ async function showOrder(idx) {
 
   const clubLabel = /club/i.test(o.club) ? 'Club' : 'Client';
   document.getElementById('detail-info').innerHTML = `
-    <div class="detail-row"><span class="detail-key">Order #</span><span class="detail-val">${o.order_number}</span></div>
-    <div class="detail-row"><span class="detail-key">${clubLabel}</span><span class="detail-val">${o.club}</span></div>
-    <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${formatShipDate(o.ship_date)}</span></div>
-    <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${o.status || 'Awaiting Approval'}</span></div>`;
+    <div class="detail-row"><span class="detail-key">Order #</span><span class="detail-val">${esc(o.order_number)}</span></div>
+    <div class="detail-row"><span class="detail-key">${clubLabel}</span><span class="detail-val">${esc(o.club)}</span></div>
+    <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${esc(formatShipDate(o.ship_date))}</span></div>
+    <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${esc(o.status || 'Awaiting Approval')}</span></div>`;
 
   const trackingHTML = o.tracking_number
     ? `<div class="detail-row"><span class="detail-key">Carrier</span><span class="detail-val">UPS</span></div>
-       <div class="detail-row"><span class="detail-key">Tracking</span><span class="detail-val"><a class="tracking-link" href="https://www.ups.com/track?tracknum=${o.tracking_number}" target="_blank">${o.tracking_number}</a></span></div>`
+       <div class="detail-row"><span class="detail-key">Tracking</span><span class="detail-val"><a class="tracking-link" href="https://www.ups.com/track?tracknum=${encodeURIComponent(o.tracking_number)}" target="_blank">${esc(o.tracking_number)}</a></span></div>`
     : `<div class="detail-row"><span class="detail-key">Tracking</span><span class="detail-val" style="color:#888;">Not yet available</span></div>`;
   document.getElementById('detail-shipping').innerHTML = trackingHTML;
 
@@ -523,13 +526,13 @@ async function showOrder(idx) {
       'Order Details';
 
     // Update Order Info to include product page and payment link if available
-    if (d.product_page || d.payment_link) {
+    if (safeUrl(d.product_page) || safeUrl(d.payment_link)) {
       const infoEl = document.getElementById('detail-info');
-      if (d.product_page) {
-        infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Product Page</span><span class="detail-val"><a href="${d.product_page}" target="_blank" style="color:#1a1a18;">View Products</a></span></div>`;
+      if (safeUrl(d.product_page)) {
+        infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Product Page</span><span class="detail-val"><a href="${esc(safeUrl(d.product_page))}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">View Products</a></span></div>`;
       }
-      if (d.payment_link) {
-        infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Payment</span><span class="detail-val"><a href="${d.payment_link}" target="_blank" style="color:#1a1a18;">Pay Invoice</a></span></div>`;
+      if (safeUrl(d.payment_link)) {
+        infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Payment</span><span class="detail-val"><a href="${esc(safeUrl(d.payment_link))}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Pay Invoice</a></span></div>`;
       }
     }
 
@@ -549,15 +552,16 @@ async function showOrder(idx) {
         ? `<span style="text-decoration:line-through; color:#aaa; display:block; font-size:12px;">${fmtMoney(item.orig_price)}</span><span>${fmtMoney(item.price)}</span>`
         : fmtMoney(item.price);
 
-      const imgHTML = item.url
-        ? `<a href="${item.url}" target="_blank"><img src="${item.url}" alt="Product" style="width:72px; height:72px; object-fit:contain; border-radius:6px; display:block; margin-bottom:6px;" /></a>`
+      const safeItemUrl = safeUrl(item.url);
+      const imgHTML = safeItemUrl
+        ? `<a href="${esc(safeItemUrl)}" target="_blank" rel="noopener noreferrer"><img src="${esc(safeItemUrl)}" alt="Product" style="width:72px; height:72px; object-fit:contain; border-radius:6px; display:block; margin-bottom:6px;" /></a>`
         : '';
 
       html += `<div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:0; padding:10px 0; border-bottom:1px solid #f0f0ee; align-items:start;">
         <div>
           ${imgHTML}
-          ${desc ? `<div style="font-size:12px; color:#666; margin-bottom:2px;">${desc}</div>` : ''}
-          ${sizes ? `<div style="font-size:12px; color:#888;">${sizes}</div>` : ''}
+          ${desc ? `<div style="font-size:12px; color:#666; margin-bottom:2px;">${esc(desc)}</div>` : ''}
+          ${sizes ? `<div style="font-size:12px; color:#888;">${esc(sizes)}</div>` : ''}
         </div>
         <div style="font-size:13px; text-align:center;">${item.quantity}</div>
         <div style="font-size:13px; text-align:right;">${priceHTML}</div>
