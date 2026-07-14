@@ -6,13 +6,33 @@ const { google } = require('googleapis');
 const path = require('path');
 const router = express.Router();
 router.use(express.json());
+const escHtml = (v) => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+// Neutralize spreadsheet formula injection on any user value we write.
+function sheetSafe(v) {
+  if (typeof v !== 'string') return v;
+  return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+}
+
+// Minimal in-memory rate limiter (per client IP + route). Fail-open on restart is fine.
+const _rlBuckets = new Map();
+function rateLimit(max, windowMs) {
+  return (req, res, next) => {
+    const key = `${req.ip || 'x'}:${req.path}`;
+    const now = Date.now();
+    const rec = _rlBuckets.get(key);
+    if (!rec || now > rec.reset) { _rlBuckets.set(key, { count: 1, reset: now + windowMs }); return next(); }
+    if (++rec.count > max) return res.status(429).json({ error: 'Too many attempts. Please wait a minute and try again.' });
+    next();
+  };
+}
 
 const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
 // JWT_SECRET must be set in the environment. The fallback exists only for local dev;
 // if it is ever used while NODE_ENV=production, log a loud warning so it gets caught.
-const JWT_SECRET = process.env.JWT_SECRET || 'mayor-portal-secret-change-in-prod';
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.error('SECURITY WARNING: JWT_SECRET is not set in production — sessions are signed with a public default. Set the JWT_SECRET env var on Render.');
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET is not set. Refusing to start the portal with an insecure default — set JWT_SECRET in the environment.');
 }
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const BASE_URL = process.env.BASE_URL || 'https://orders.mayorclothing.com';
@@ -111,14 +131,14 @@ async function upsertUser(email, passwordHash, club) {
       spreadsheetId: SHEET_ID,
       range: 'Users!A:C',
       valueInputOption: 'USER_ENTERED',
-      resource: { values: [[email, passwordHash, club]] }
+      resource: { values: [[email, passwordHash, club].map(sheetSafe)] }
     });
   } else {
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
       range: `Users!A${rowIdx + 1}:C${rowIdx + 1}`,
       valueInputOption: 'USER_ENTERED',
-      resource: { values: [[email, passwordHash, club]] }
+      resource: { values: [[email, passwordHash, club].map(sheetSafe)] }
     });
   }
 }
@@ -255,11 +275,11 @@ async function sendResetEmail(email, token) {
 
 async function sendReorderEmail(data) {
   await sendEmail('mayor@mayorclothing.com', `Reorder Request — ${data.club}`,
-    `<p><strong>Club:</strong> ${data.club}</p>
-     <p><strong>Original order:</strong> ${data.order_number}</p>
-     <p><strong>Contact:</strong> ${data.email}</p>
+    `<p><strong>Club:</strong> ${escHtml(data.club)}</p>
+     <p><strong>Original order:</strong> ${escHtml(data.order_number)}</p>
+     <p><strong>Contact:</strong> ${escHtml(data.email)}</p>
      <p><strong>Notes:</strong></p>
-     <p style="white-space:pre-wrap;">${data.notes || 'No notes provided'}</p>`
+     <p style="white-space:pre-wrap;">${escHtml(data.notes || 'No notes provided')}</p>`
   );
 }
 
@@ -281,7 +301,7 @@ router.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'portal.html'));
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', rateLimit(10, 60000), async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
@@ -304,7 +324,7 @@ router.post('/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', rateLimit(5, 60000), async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
@@ -320,12 +340,13 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-router.post('/set-password', async (req, res) => {
+router.post('/set-password', rateLimit(10, 60000), async (req, res) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ error: 'Token and password required' });
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
     const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.action !== 'reset') return res.status(400).json({ error: 'Invalid or expired link' });
     const hash = await bcrypt.hash(password, 10);
     const orders = await getOrdersFromSheet(payload.email);
     const club = orders.length ? orders[0].club : '';
@@ -338,15 +359,16 @@ router.post('/set-password', async (req, res) => {
 });
 
 // Create account — allowed if email has any order in Order Info
-router.post('/create-account', async (req, res) => {
+router.post('/create-account', rateLimit(5, 60000), async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
     const hasOrders = await emailHasOrders(email);
-    if (!hasOrders) return res.status(403).json({ error: 'No orders found for this email. Please contact Mayor Clothing.' });
     const existing = await getUserFromSheet(email);
-    if (existing && existing.passwordHash) return res.status(400).json({ error: 'An account already exists for this email. Use Forgot password to reset it.' });
+    if (!hasOrders || (existing && existing.passwordHash)) {
+      return res.status(400).json({ error: 'We couldn\u2019t create an account with those details. If you already have one, use Forgot password; otherwise contact Mayor Clothing.' });
+    }
     const orders = await getOrdersFromSheet(email);
     const hash = await bcrypt.hash(password, 10);
     await upsertUser(email, hash, orders[0]?.club || '');
