@@ -535,6 +535,23 @@ async function showOrder(idx) {
     : `<div class="detail-row"><span class="detail-key">Tracking</span><span class="detail-val" style="color:#888;">Not yet available</span></div>`;
   document.getElementById('detail-shipping').innerHTML = trackingHTML;
 
+  if (o.tracking_number) {
+    fetch('/portal/tracking/' + encodeURIComponent(o.order_number), { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(t => {
+        if (!t) return;
+        const upsDate = t.lastActivity && /^\d{8}$/.test(t.lastActivity.date)
+          ? formatShipDate(`${t.lastActivity.date.slice(0,4)}-${t.lastActivity.date.slice(4,6)}-${t.lastActivity.date.slice(6,8)}`)
+          : '';
+        const activity = t.lastActivity
+          ? ` — ${esc(t.lastActivity.description)}${t.lastActivity.location ? ' (' + esc(t.lastActivity.location) + ')' : ''}${upsDate ? ', ' + esc(upsDate) : ''}`
+          : '';
+        document.getElementById('detail-shipping').innerHTML += `
+          <div class="detail-row"><span class="detail-key">UPS Status</span><span class="detail-val">${esc(t.status)}${activity}</span></div>`;
+      })
+      .catch(() => {});
+  }
+
   showPage('detail');
 
   // Fetch full order detail in background

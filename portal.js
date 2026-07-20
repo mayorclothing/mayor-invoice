@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { google } = require('googleapis');
 const path = require('path');
+const { trackPackage } = require('./ups');
 const router = express.Router();
 router.use(express.json());
 const escHtml = (v) => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -404,6 +405,23 @@ router.get('/order-detail/:order_number', requireAuth, async (req, res) => {
   } catch(e) {
     console.error('Order detail error:', e);
     res.status(500).json({ error: 'Could not load order details' });
+  }
+});
+
+// Live UPS tracking status for an order's package
+router.get('/tracking/:order_number', requireAuth, async (req, res) => {
+  try {
+    const orders = req.user.admin ? await getAllOrdersFromSheet() : await getOrdersFromSheet(req.user.email);
+    const order = orders.find(o => o.order_number === req.params.order_number);
+    if (!order) return res.status(403).json({ error: 'Not authorized' });
+    if (!order.tracking_number) return res.status(404).json({ error: 'No tracking number yet' });
+
+    const info = await trackPackage(order.tracking_number);
+    if (!info) return res.status(404).json({ error: 'No tracking data yet' });
+    res.json(info);
+  } catch (e) {
+    console.error('UPS tracking error:', e);
+    res.status(502).json({ error: 'Could not reach UPS' });
   }
 });
 

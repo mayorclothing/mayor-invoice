@@ -73,6 +73,8 @@ Express **5**. Renders invoice PDFs and serves a customer-facing order portal.
 | `RESEND_API_KEY` | portal password-reset / notification mail |
 | `BASE_URL` | defaults to `https://orders.mayorclothing.com` |
 | `PORT` | Render sets it |
+| `UPS_CLIENT_ID` / `UPS_CLIENT_SECRET` | OAuth client-credentials app from developer.ups.com (register a Tracking API app). Powers live "UPS Status" on the order detail page. |
+| `UPS_ENV` | `test` → CIE sandbox host; anything else (or unset) → production. |
 
 **Run locally**: `npm install && node index.js` (→ `:3000`). **No test suite** (`npm test` is a placeholder that errors).
 
