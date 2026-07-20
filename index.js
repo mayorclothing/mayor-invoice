@@ -113,6 +113,7 @@ async function appendOrderToSheet(data) {
       data.strike_shipping ? '1' : '',
       data.custom_label || '',
       data.sample_reimbursement || '',
+      data.in_hand_date || '',
     ];
 
     // Helper: find next empty row in column A (after header), then write rowData there

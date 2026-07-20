@@ -176,7 +176,7 @@ function parseSheetRow(row) {
   // AK=36 ProductPage
   // AL=37 ShippingAddress, AM=38 DateLabel, AN=39 PaymentLink2
   // AO=40 PaymentTerms, AP=41 StrikeEmb, AQ=42 StrikeArt, AR=43 StrikeShip
-  // AS=44 CustomLabel, AT=45 SampleReimbursement
+  // AS=44 CustomLabel, AT=45 SampleReimbursement, AU=46 InHandDate
   const itemOffsets = [
     [6,7,8,9,10], [11,12,13,14,15], [16,17,18,19,20],
     [26,27,28,29,30], [31,32,33,34,35]
@@ -224,6 +224,7 @@ function parseSheetRow(row) {
     strike_shipping:   row[43] !== undefined && row[43] !== '' ? row[43] === '1' : false,
     custom_label:      row[44] ? parseCurrency(row[44]) : null,
     sample_reimbursement: row[45] || null,
+    in_hand_date:      row[46] || '',
   };
 }
 
@@ -417,7 +418,10 @@ router.get('/confirmation/:order_number', requireAuth, async (req, res) => {
     const sheets = await getSheets();
     const confRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: 'Order Confirmations!A:AK',
+      // Full range through AU — parseSheetRow reads shipping_address, payment_terms,
+      // payment_link_2, custom_label, sample_reimbursement, in_hand_date, etc. from
+      // columns AL onward; a narrower range silently dropped them from the PDF.
+      range: 'Order Confirmations!A:AU',
     });
     const confRow = (confRes.data.values || []).find(r => r[0] && r[0] === req.params.order_number);
     if (!confRow) return res.status(404).json({ error: 'Order confirmation not available.' });
@@ -451,7 +455,7 @@ router.get('/invoice/:order_number', requireAuth, async (req, res) => {
     const sheets = await getSheets();
     const invRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: 'Invoices!A:AK',
+      range: 'Invoices!A:AU', // see comment on the Order Confirmations read above
     });
     const invRow = (invRes.data.values || []).find(r => r[0] && r[0] === req.params.order_number);
     if (!invRow) return res.status(404).json({ error: 'Invoice not available yet. Your order confirmation is still being reviewed.' });

@@ -209,7 +209,10 @@
         <h1 id="detail-order-number"></h1>
         <p class="subtitle" id="detail-club" style="margin:0;"></p>
       </div>
-      <span class="badge" id="detail-status-badge"></span>
+      <div style="text-align:right;">
+        <span class="badge" id="detail-status-badge"></span>
+        <div id="detail-dates" style="margin-top:8px; font-size:12px; color:#888; line-height:1.6;"></div>
+      </div>
     </div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
@@ -228,24 +231,13 @@
       <div id="detail-items"></div>
     </div>
 
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-      <div class="card" style="display:flex; flex-direction:column;">
-        <p class="section-label">Order Confirmation</p>
-        <p style="font-size:13px; color:#888; margin-bottom:12px; flex:1;">Review your order details above. Email <a href="mailto:mayor@mayorclothing.com" style="color:#1a1a18;">mayor@mayorclothing.com</a> to confirm or request any changes.</p>
-        <button class="btn" onclick="downloadConfirmation()">Download Order Confirmation PDF</button>
-      </div>
-      <div class="card" style="display:flex; flex-direction:column;">
-        <p class="section-label">Invoice</p>
-        <p style="font-size:13px; color:#888; margin-bottom:12px; flex:1;">Download your invoice PDF. Available once your order has been confirmed and invoiced.</p>
-        <button class="btn" onclick="downloadInvoice()">Download Invoice PDF</button>
-      </div>
+    <div class="card" id="detail-download-card" style="display:none;">
+      <button class="btn" id="detail-download-btn"></button>
     </div>
-    <div style="margin-top:1rem;">
-      <div class="card">
-        <p class="section-label">Reorder</p>
-        <p style="font-size:13px; color:#888; margin-bottom:12px;">Want to place another order? Let us know your preferences and we'll be in touch.</p>
-        <button class="btn" onclick="showReorder()">Request Reorder</button>
-      </div>
+
+    <div class="card" id="detail-terms-card" style="display:none; margin-top:1rem;">
+      <p class="section-label">Payment Terms</p>
+      <p id="detail-terms-text" style="font-size:12px; color:#888; line-height:1.6;"></p>
     </div>
   </div>
 </div>
@@ -411,10 +403,19 @@ function logout() {
   showPage('login');
 }
 
+// ── XSS GUARDS ──
+// Everything rendered below comes from the Google Sheet, which untrusted callers
+// can write to via /generate. Escape all text; allow only https URLs in href/src.
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function safeUrl(u) {
+  try { return new URL(u).protocol === 'https:' ? u : ''; } catch(e) { return ''; }
+}
+
 // ── ORDERS ──
-function esc(v) { return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-function safeUrl(u) { try { const url = new URL(String(u)); return url.protocol === 'https:' ? url.href : ''; } catch (e) { return ''; } }
-function badgeClass(status) { return 'badge-' + String(status || 'pending').toLowerCase().replace(/[^a-z]/g, ''); }
 async function loadOrders() {
   showPage('orders');
   const _h1 = document.querySelector('#page-orders h1'); if (_h1) _h1.textContent = currentUser.admin ? 'All Orders' : 'Your Orders';
@@ -439,11 +440,11 @@ async function loadOrders() {
           <div class="order-meta">${esc(o.club)}${currentUser.admin && o.email ? ' · ' + esc(o.email) : ''} · ${esc(o.ship_date)}</div>
         </div>
         <div class="order-right">
-          <span class="badge ${badgeClass(o.status)}">${esc(o.status || 'Pending')}</span>
+          <span class="badge badge-${esc((o.status||'pending').toLowerCase())}">${esc(displayStatus(o.status))}</span>
         </div>
       </div>`).join('');
   } catch(e) {
-    list.innerHTML = `<p style="color:#dc2626; font-size:13px;">${e.message}</p>`;
+    list.innerHTML = `<p style="color:#dc2626; font-size:13px;">${esc(e.message)}</p>`;
   }
 }
 
@@ -471,7 +472,34 @@ function stripSizes(desc) {
 }
 
 function fmtMoney(n) {
-  return '$' + Number(n).toFixed(2);
+  const num = Number(n) || 0;
+  const hasCents = Math.round(num * 100) % 100 !== 0;
+  return '$' + num.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: 2 });
+}
+
+// "pending" reads like back-office jargon to a customer — show it as "In Progress".
+function displayStatus(status) {
+  const s = (status || '').trim();
+  return (!s || s.toLowerCase() === 'pending') ? 'In Progress' : s;
+}
+
+const DEFAULT_W9 = 'https://drive.google.com/file/d/1iZD_sP2WQbfPrXkHIcPqf7XawDMP2Zi1/view';
+
+// Mirrors the payment-terms text built server-side in doc-render.js so the
+// portal page and the PDF always read the same.
+function buildTermsHTML(d, isClub) {
+  const isSplitPayment = !!(safeUrl(d.payment_link_2));
+  const noun = isClub ? 'club' : 'client';
+  const nounPl = isClub ? 'clubs' : 'clients';
+  let termsText;
+  if (d.payment_terms && d.payment_terms.trim()) {
+    termsText = d.payment_terms.trim().replace(/\.$/, '') + `. Based on our custom model, garments are produced specially for each ${noun}. Once ${nounPl} approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. `;
+  } else {
+    const leadIn = isSplitPayment ? '50% deposit, 50% on receipt. ' : 'Due on receipt. ';
+    termsText = leadIn + `Based on our custom model, garments are produced specially for each ${noun}. Once ${nounPl} approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. `;
+  }
+  const w9 = /^https:/.test(d.w9_link || '') ? d.w9_link : DEFAULT_W9;
+  return esc(termsText) + `<a href="${esc(w9)}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Here</a> is our W-9.`;
 }
 
 // Parse a value that may be stored as "$1,776.00", "(250.00)", "1776", "", null, etc.
@@ -497,15 +525,18 @@ async function showOrder(idx) {
     'delivered': 'badge-delivered'
   };
   const badge = document.getElementById('detail-status-badge');
-  badge.textContent = o.status || 'Awaiting Approval';
+  badge.textContent = displayStatus(o.status);
   badge.className = 'badge ' + (statusColors[(o.status||'').toLowerCase()] || 'badge-pending');
+
+  document.getElementById('detail-dates').innerHTML =
+    `<div>Ship Date: ${esc(formatShipDate(o.ship_date))}</div>`;
 
   const clubLabel = /club/i.test(o.club) ? 'Club' : 'Client';
   document.getElementById('detail-info').innerHTML = `
     <div class="detail-row"><span class="detail-key">Order #</span><span class="detail-val">${esc(o.order_number)}</span></div>
     <div class="detail-row"><span class="detail-key">${clubLabel}</span><span class="detail-val">${esc(o.club)}</span></div>
     <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${esc(formatShipDate(o.ship_date))}</span></div>
-    <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${esc(o.status || 'Awaiting Approval')}</span></div>`;
+    <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${esc(displayStatus(o.status))}</span></div>`;
 
   const trackingHTML = o.tracking_number
     ? `<div class="detail-row"><span class="detail-key">Carrier</span><span class="detail-val">UPS</span></div>
@@ -517,6 +548,8 @@ async function showOrder(idx) {
 
   // Fetch full order detail in background
   document.getElementById('detail-items-card').style.display = 'none';
+  document.getElementById('detail-download-card').style.display = 'none';
+  document.getElementById('detail-terms-card').style.display = 'none';
   try {
     const res = await fetch('/portal/order-detail/' + encodeURIComponent(o.order_number), { credentials: 'include' });
     if (!res.ok) throw new Error('Details not available');
@@ -525,16 +558,39 @@ async function showOrder(idx) {
     document.getElementById('detail-items-label').textContent =
       'Order Details';
 
-    // Update Order Info to include product page and payment link if available
-    if (safeUrl(d.product_page) || safeUrl(d.payment_link)) {
-      const infoEl = document.getElementById('detail-info');
-      if (safeUrl(d.product_page)) {
-        infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Product Page</span><span class="detail-val"><a href="${esc(safeUrl(d.product_page))}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">View Products</a></span></div>`;
-      }
-      if (safeUrl(d.payment_link)) {
-        infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Payment</span><span class="detail-val"><a href="${esc(safeUrl(d.payment_link))}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Pay Invoice</a></span></div>`;
-      }
+    // In-hand date, alongside ship date at top right
+    if (d.in_hand_date) {
+      document.getElementById('detail-dates').innerHTML +=
+        `<div>In-Hand Date: ${esc(formatShipDate(d.in_hand_date))}</div>`;
     }
+
+    // Shipping/billing addresses — only show Shipping Address separately if it differs
+    const hasShipAddr = d.shipping_address && d.shipping_address.trim() && d.shipping_address.trim() !== (d.address || '').trim();
+    const addrToHTML = (label, addr) => addr && addr.trim()
+      ? `<div class="detail-row" style="align-items:flex-start;"><span class="detail-key">${label}</span><span class="detail-val" style="white-space:pre-line; text-align:right;">${esc(addr.trim())}</span></div>`
+      : '';
+    document.getElementById('detail-shipping').innerHTML =
+      trackingHTML +
+      addrToHTML(hasShipAddr ? 'Billing Address' : 'Shipping / Billing Address', d.address) +
+      (hasShipAddr ? addrToHTML('Shipping Address', d.shipping_address) : '');
+
+    // Payment link (renamed from "Payment"/"Pay Invoice" per request)
+    if (safeUrl(d.payment_link)) {
+      const infoEl = document.getElementById('detail-info');
+      infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Payment Link</span><span class="detail-val"><a href="${esc(safeUrl(d.payment_link))}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Pay</a></span></div>`;
+    }
+
+    // Single smart download button: invoice if there's a payment link (order has
+    // been invoiced), otherwise the order confirmation.
+    const hasPaymentLink = !!(safeUrl(d.payment_link) || safeUrl(d.payment_link_2));
+    const downloadBtn = document.getElementById('detail-download-btn');
+    downloadBtn.textContent = hasPaymentLink ? 'Download Invoice' : 'Download Order Confirmation';
+    downloadBtn.onclick = hasPaymentLink ? downloadInvoice : downloadConfirmation;
+    document.getElementById('detail-download-card').style.display = 'block';
+
+    // Full payment terms, shown at the bottom of the page (mirrors doc-render.js)
+    document.getElementById('detail-terms-text').innerHTML = buildTermsHTML(d, clubLabel === 'Club');
+    document.getElementById('detail-terms-card').style.display = 'block';
 
     let html = '';
 
@@ -552,9 +608,13 @@ async function showOrder(idx) {
         ? `<span style="text-decoration:line-through; color:#aaa; display:block; font-size:12px;">${fmtMoney(item.orig_price)}</span><span>${fmtMoney(item.price)}</span>`
         : fmtMoney(item.price);
 
-      const safeItemUrl = safeUrl(item.url);
-      const imgHTML = safeItemUrl
-        ? `<a href="${esc(safeItemUrl)}" target="_blank" rel="noopener noreferrer"><img src="${esc(safeItemUrl)}" alt="Product" style="width:72px; height:72px; object-fit:contain; border-radius:6px; display:block; margin-bottom:6px;" /></a>`
+      const imgUrl = safeUrl(item.url);
+      const imgHTML = imgUrl
+        ? `<a href="${esc(imgUrl)}" target="_blank" rel="noopener noreferrer"><img src="${esc(imgUrl)}" alt="Product" style="width:72px; height:72px; object-fit:contain; border-radius:6px; display:block; margin-bottom:6px;" /></a>`
+        : '';
+      const productLink = safeUrl(d.product_page);
+      const productLinkHTML = productLink
+        ? `<div style="font-size:12px; margin-top:2px;"><a href="${esc(productLink)}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Additional Details</a></div>`
         : '';
 
       html += `<div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:0; padding:10px 0; border-bottom:1px solid #f0f0ee; align-items:start;">
@@ -562,8 +622,9 @@ async function showOrder(idx) {
           ${imgHTML}
           ${desc ? `<div style="font-size:12px; color:#666; margin-bottom:2px;">${esc(desc)}</div>` : ''}
           ${sizes ? `<div style="font-size:12px; color:#888;">${esc(sizes)}</div>` : ''}
+          ${productLinkHTML}
         </div>
-        <div style="font-size:13px; text-align:center;">${item.quantity}</div>
+        <div style="font-size:13px; text-align:center;">${esc(item.quantity)}</div>
         <div style="font-size:13px; text-align:right;">${priceHTML}</div>
       </div>`;
     });
