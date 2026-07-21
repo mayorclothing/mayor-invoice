@@ -4,15 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mayor — My Orders</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Times New Roman', Times, serif; background: #f5f5f4; color: #1a1a18; min-height: 100vh; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #fafafa; color: #18181b; min-height: 100vh; }
   
   /* NAV */
-  nav { background: white; border-bottom: 1px solid #e5e5e3; padding: 0 2rem; height: 60px; display: flex; align-items: center; justify-content: space-between; }
-  .nav-logo { font-size: 22px; font-style: italic; letter-spacing: 0.02em; }
-  .nav-right { font-size: 13px; color: #888; }
-  .nav-right a { color: #1a1a18; text-decoration: none; }
+  nav { background: white; border-bottom: 1px solid #e4e4e7; padding: 0 2rem; height: 60px; display: flex; align-items: center; justify-content: space-between; }
+  .nav-logo { font-size: 22px; letter-spacing: 0.02em; }
+  .nav-right { font-size: 13px; color: #71717a; }
+  .nav-right a { color: #18181b; text-decoration: none; }
   .nav-right a:hover { text-decoration: underline; }
 
   /* LAYOUT */
@@ -22,46 +26,53 @@
   .container-wide { max-width: 900px; margin: 0 auto; padding: 2.5rem 1rem; }
 
   /* CARDS */
-  .card { background: white; border: 1px solid #e5e5e3; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+  .card { background: white; border: 1px solid #e4e4e7; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
 
   /* TYPOGRAPHY */
-  h1 { font-size: 22px; font-weight: 400; margin-bottom: 0.5rem; }
+  h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 0.5rem; }
   h2 { font-size: 17px; font-weight: 600; margin-bottom: 1rem; }
-  .subtitle { font-size: 14px; color: #888; margin-bottom: 1.5rem; }
-  .section-label { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .subtitle { font-size: 14px; color: #71717a; margin-bottom: 1.5rem; }
+  .section-label { font-size: 11px; font-weight: 600; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
 
   /* FORMS */
   .field { margin-bottom: 14px; }
-  label { font-size: 13px; color: #666; display: block; margin-bottom: 5px; }
-  input, select, textarea { width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; background: white; color: #1a1a18; }
-  input:focus, select:focus { outline: 2px solid #1a1a18; outline-offset: 1px; }
-  .btn { display: block; width: 100%; padding: 11px; font-size: 14px; font-family: inherit; border: none; border-radius: 8px; background: #1a1a18; color: white; cursor: pointer; text-align: center; }
-  .btn:hover { background: #333; }
+  label { font-size: 13px; color: #52525b; display: block; margin-bottom: 5px; }
+  input, select, textarea { width: 100%; padding: 9px 12px; border: 1px solid #d4d4d8; border-radius: 8px; font-size: 14px; font-family: inherit; background: white; color: #18181b; }
+  input:focus, select:focus { outline: 2px solid #18181b; outline-offset: 1px; }
+  .btn { display: block; width: 100%; padding: 11px; font-size: 14px; font-family: inherit; border: none; border-radius: 8px; background: #18181b; color: white; cursor: pointer; text-align: center; transition: background 0.15s; }
+  .btn:hover { background: #27272a; }
   .btn:disabled { opacity: 0.5; cursor: default; }
-  .btn-outline { background: white; color: #1a1a18; border: 1px solid #ccc; }
-  .btn-outline:hover { background: #f5f5f4; }
+  .btn-outline { background: white; color: #18181b; border: 1px solid #d4d4d8; }
+  .btn-outline:hover { background: #fafafa; }
   .btn-sm { display: inline-block; width: auto; padding: 7px 14px; font-size: 13px; }
 
-  /* STATUS BADGES */
-  .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
-  .badge-pending  { background: #fef3c7; color: #92400e; }
-  .badge-shipped  { background: #dbeafe; color: #1e40af; }
-  .badge-delivered{ background: #d1fae5; color: #065f46; }
+  /* STATUS BADGES — shadcn-style pill with a leading dot */
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 10px 3px 8px; border-radius: 999px; font-weight: 500; border: 1px solid transparent; }
+  .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .badge-pending   { background: #fef9c3; color: #854d0e; border-color: #fef08a; }
+  .badge-shipped   { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+  .badge-delivered { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+  .badge-exception { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+  .badge-unknown   { background: #f4f4f5; color: #52525b; border-color: #e4e4e7; }
 
   /* ORDER LIST */
-  .order-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0ee; cursor: pointer; }
+  .order-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #f4f4f5; cursor: pointer; }
   .order-row:last-child { border-bottom: none; }
-  .order-row:hover { background: #fafaf9; margin: 0 -1.5rem; padding: 14px 1.5rem; border-radius: 8px; }
+  .order-row:hover { background: #fafafa; margin: 0 -1.5rem; padding: 14px 1.5rem; border-radius: 8px; }
   .order-title { font-size: 14px; font-weight: 500; }
-  .order-meta { font-size: 12px; color: #888; margin-top: 3px; }
+  .order-meta { font-size: 12px; color: #71717a; margin-top: 3px; }
   .order-right { text-align: right; }
   .order-amount { font-size: 14px; font-weight: 500; }
 
   /* ORDER DETAIL */
-  .detail-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f0f0ee; font-size: 13px; }
+  .detail-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f4f4f5; font-size: 13px; }
   .detail-row:last-child { border-bottom: none; }
-  .detail-key { color: #888; }
+  .detail-key { color: #71717a; }
   .detail-val { font-weight: 500; text-align: right; }
+
+  /* SHIPPING TRACKER */
+  .ups-scan { font-size: 12px; color: #71717a; margin-top: 8px; line-height: 1.5; padding-top: 8px; border-top: 1px solid #f4f4f5; }
+  .ups-scan strong { color: #18181b; font-weight: 500; }
 
   /* ALERTS */
   .alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
@@ -543,11 +554,19 @@ async function showOrder(idx) {
         const upsDate = t.lastActivity && /^\d{8}$/.test(t.lastActivity.date)
           ? formatShipDate(`${t.lastActivity.date.slice(0,4)}-${t.lastActivity.date.slice(4,6)}-${t.lastActivity.date.slice(6,8)}`)
           : '';
-        const activity = t.lastActivity
-          ? ` — ${esc(t.lastActivity.description)}${t.lastActivity.location ? ' (' + esc(t.lastActivity.location) + ')' : ''}${upsDate ? ', ' + esc(upsDate) : ''}`
+        const upsBadgeClass = {
+          D: 'badge-delivered',   // Delivered
+          X: 'badge-exception',   // Exception
+          I: 'badge-shipped',     // In transit
+          M: 'badge-pending',     // Manifest / label created
+          P: 'badge-pending',     // Pickup
+        }[t.statusCode] || 'badge-unknown';
+        const scanLine = t.lastActivity
+          ? `<div class="ups-scan"><strong>${esc(t.lastActivity.description)}</strong>${t.lastActivity.location ? ' · ' + esc(t.lastActivity.location) : ''}${upsDate ? ' · ' + esc(upsDate) : ''}</div>`
           : '';
         document.getElementById('detail-shipping').innerHTML += `
-          <div class="detail-row"><span class="detail-key">UPS Status</span><span class="detail-val">${esc(t.status)}${activity}</span></div>`;
+          <div class="detail-row"><span class="detail-key">UPS Status</span><span class="detail-val"><span class="badge ${upsBadgeClass}">${esc(t.status)}</span></span></div>
+          ${scanLine}`;
       })
       .catch(() => {});
   }
