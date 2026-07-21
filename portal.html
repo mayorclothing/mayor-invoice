@@ -74,6 +74,15 @@
   .page-heading.on-light .back { color: var(--muted-foreground); }
   .page-heading.on-light .back:hover { color: var(--foreground); }
 
+  /* Same problem as .page-heading: this sits directly on the page background,
+     which can be a per-order swatch of any color. Plain gray fine print read
+     fine on the flat black default but visually collided with a light/busy
+     swatch pattern. */
+  .fine-print { background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); border-radius: var(--radius-control); padding: 10px 14px; }
+  .fine-print p { font-size: 11px; color: rgba(255,255,255,0.75); line-height: 1.6; }
+  .fine-print.on-light { background: rgba(255,255,255,0.7); }
+  .fine-print.on-light p { color: var(--muted-foreground); }
+
   /* CARDS */
   .card { background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
 
@@ -319,8 +328,8 @@
       <button class="btn" id="detail-download-btn"></button>
     </div>
 
-    <div id="detail-terms-card" style="display:none; margin-top:1rem; padding:0 0.25rem;">
-      <p id="detail-terms-text" style="font-size:11px; color:#aaa; line-height:1.6;"></p>
+    <div id="detail-terms-card" class="fine-print" style="display:none; margin-top:1rem;">
+      <p id="detail-terms-text"></p>
     </div>
   </div>
 </div>
@@ -609,7 +618,7 @@ function buildTermsHTML(d) {
     termsText = leadIn + 'Based on our custom model, garments are produced specially for each customer. Once customers approve their order, they are responsible for payment of its full value. There are no returns or exchanges. All sales are final. ';
   }
   const w9 = /^https:/.test(d.w9_link || '') ? d.w9_link : DEFAULT_W9;
-  return esc(termsText) + `<a href="${esc(w9)}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Here</a> is our W-9.`;
+  return esc(termsText) + `<a href="${esc(w9)}" target="_blank" rel="noopener noreferrer" style="color:inherit;">Here</a> is our W-9.`;
 }
 
 // Parse a value that may be stored as "$1,776.00", "(250.00)", "1776", "", null, etc.
@@ -632,7 +641,7 @@ async function showOrder(idx) {
   // pattern (detail-bg class) when none exists -- clear any previous order's swatch
   // first so it doesn't linger while this one loads or if this order has none.
   document.body.style.backgroundImage = '';
-  document.getElementById('page-detail').querySelector('.page-heading').classList.remove('on-light');
+  document.querySelectorAll('#page-detail .page-heading, #page-detail .fine-print').forEach(el => el.classList.remove('on-light'));
   const swatchProbe = new Image();
   swatchProbe.onload = () => {
     // These swatch files (unlike our own auth-bg patterns) already contain a dense
@@ -656,7 +665,7 @@ async function showOrder(idx) {
     let total = 0;
     for (let i = 0; i < px.length; i += 4) total += (px[i] + px[i+1] + px[i+2]) / 3;
     const avgBrightness = total / (px.length / 4);
-    document.getElementById('page-detail').querySelector('.page-heading').classList.toggle('on-light', avgBrightness > 180);
+    document.querySelectorAll('#page-detail .page-heading, #page-detail .fine-print').forEach(el => el.classList.toggle('on-light', avgBrightness > 180));
   };
   swatchProbe.src = '/swatches/' + encodeURIComponent(o.order_number);
 
