@@ -185,28 +185,29 @@
 
 <!-- PAGE: CREATE ACCOUNT -->
 <div class="page" id="page-create-account">
-  <div class="container" style="max-width:420px;">
-    <span class="back" onclick="showPage('login')">← Back to sign in</span>
-    <h1>Create your account</h1>
-    <p class="subtitle" style="margin-bottom:1.5rem;">Enter your email and choose a password to access your Mayor orders.</p>
-    <div class="card">
+  <div class="auth-page-bg">
+    <div class="auth-center-card">
+      <a href="#" class="auth-logo"><img src="/mayor-logo.png" alt="Mayor" /></a>
+      <h1 class="auth-heading">Create your account</h1>
+      <p class="subtitle">Enter your email and choose a password to access your Mayor orders.</p>
       <div id="create-alert"></div>
       <div class="field"><label>Email</label><input type="email" id="create-email" placeholder="you@example.com" /></div>
       <div class="field">
         <label>Password</label>
         <div style="position:relative;">
           <input type="password" id="create-password" placeholder="At least 8 characters" style="padding-right:48px;" />
-          <span onclick="togglePw('create-password','toggle-create')" id="toggle-create" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:12px;">Show</span>
+          <span onclick="togglePw('create-password','toggle-create')" id="toggle-create" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted-foreground);font-size:12px;">Show</span>
         </div>
       </div>
       <div class="field">
         <label>Confirm password</label>
         <div style="position:relative;">
           <input type="password" id="create-confirm" placeholder="Repeat password" style="padding-right:48px;" />
-          <span onclick="togglePw('create-confirm','toggle-confirm')" id="toggle-confirm" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:12px;">Show</span>
+          <span onclick="togglePw('create-confirm','toggle-confirm')" id="toggle-confirm" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted-foreground);font-size:12px;">Show</span>
         </div>
       </div>
-      <button class="btn" onclick="doCreateAccount()" id="create-btn">Create account</button>
+      <button class="btn auth-btn" onclick="doCreateAccount()" id="create-btn">Create account</button>
+      <p class="auth-bottom">Already have an account? <a href="#" onclick="showPage('login')">Sign in</a></p>
     </div>
   </div>
 </div>
@@ -338,7 +339,7 @@ function formatShipDate(dateStr) {
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  document.body.classList.toggle('auth-fullbleed', name === 'login');
+  document.body.classList.toggle('auth-fullbleed', name === 'login' || name === 'create-account');
 }
 
 function showForgot() { showPage('forgot'); }
