@@ -641,8 +641,8 @@ async function showOrder(idx) {
     // (reported as "numbers overlapping"). cover/no-repeat shows it as one
     // continuous swath instead.
     document.body.style.backgroundImage = `url('${swatchProbe.src}')`;
-    document.body.style.backgroundSize = 'cover';
-    document.body.style.backgroundRepeat = 'no-repeat';
+    document.body.style.backgroundSize = '700px auto';
+    document.body.style.backgroundRepeat = 'repeat';
     document.body.style.backgroundPosition = 'center';
 
     // Most prints are white/light -- a fixed dark heading chip looks like a
