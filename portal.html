@@ -393,7 +393,7 @@ function showPage(name) {
   document.getElementById('page-' + name).classList.add('active');
   document.body.classList.toggle('auth-fullbleed', name === 'login' || name === 'create-account' || name === 'forgot');
   document.body.classList.toggle('detail-bg', name === 'detail');
-  if (name !== 'detail') { document.body.style.backgroundImage = ''; document.body.style.backgroundSize = ''; }
+  if (name !== 'detail') { document.body.style.backgroundImage = ''; document.body.style.backgroundSize = ''; document.body.style.backgroundColor = ''; }
 }
 
 function showForgot() { showPage('forgot'); }
@@ -649,22 +649,31 @@ async function showOrder(idx) {
     // (e.g. a disconnected top-of-the-"2") wherever tiles meet. No repeat means
     // no boundary for that to happen at, at the cost of only showing one
     // (already print-dense) instance instead of a repeated field of them.
-    document.body.style.backgroundImage = `url('${swatchProbe.src}')`;
-    document.body.style.backgroundSize = 'cover';
-    document.body.style.backgroundRepeat = 'no-repeat';
-    document.body.style.backgroundPosition = 'center';
-
-    // Most prints are white/light -- a fixed dark heading chip looks like a
-    // mismatched gray box stuck on top. Sample the swatch's average brightness
-    // and flip the chip + text to a light/frosted variant when it's a light print.
+    // Sample the swatch's average color first (same-origin canvas read, no CORS
+    // issue) -- used two ways: (1) light/dark heading-chip variant, since most
+    // prints are white and a fixed dark chip looked like a mismatched box, and
+    // (2) as the page's background-color fallback, so shrinking the image below
+    // "cover" (to "zoom out" -- show more of the print's own internal repeat
+    // instead of cropping in tight) exposes matching color at the edges instead
+    // of a jarring black gap, without needing CSS repeat (which slices glyphs at
+    // tile boundaries -- see the removed tiling code this replaced).
     const c = document.createElement('canvas');
     c.width = 20; c.height = 20;
     const ctx = c.getContext('2d');
     ctx.drawImage(swatchProbe, 0, 0, 20, 20);
     const px = ctx.getImageData(0, 0, 20, 20).data;
-    let total = 0;
-    for (let i = 0; i < px.length; i += 4) total += (px[i] + px[i+1] + px[i+2]) / 3;
-    const avgBrightness = total / (px.length / 4);
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i+1]; b += px[i+2]; }
+    const n = px.length / 4;
+    r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+    const avgBrightness = (r + g + b) / 3;
+
+    document.body.style.backgroundImage = `url('${swatchProbe.src}')`;
+    document.body.style.backgroundColor = `rgb(${r},${g},${b})`;
+    document.body.style.backgroundSize = '75%';
+    document.body.style.backgroundRepeat = 'no-repeat';
+    document.body.style.backgroundPosition = 'center';
+
     document.querySelectorAll('#page-detail .page-heading, #page-detail .fine-print').forEach(el => el.classList.toggle('on-light', avgBrightness > 180));
   };
   swatchProbe.src = '/swatches/' + encodeURIComponent(o.order_number);
