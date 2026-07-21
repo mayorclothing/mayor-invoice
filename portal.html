@@ -38,13 +38,18 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--muted) url('/auth-bg-1.png') center/950px repeat; color: var(--foreground); min-height: 100vh; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #000 url('/auth-bg-1.png') top left/1725px repeat; color: var(--foreground); min-height: 100vh; }
+  body.detail-bg { background-image: url('/auth-bg-3.png'); background-size: 1732px auto; }
 
   /* NAV */
-  nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 2rem; height: 60px; display: flex; align-items: center; justify-content: space-between; }
+  /* Nav only ever shows on the black-background app pages now (auth pages hide it
+     entirely via auth-fullbleed), so it's styled dark to match rather than sitting
+     as a jarring white strip on top of a black page. */
+  nav { background: #111; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 0 2rem; height: 60px; display: flex; align-items: center; justify-content: space-between; }
   .nav-logo { font-size: 22px; letter-spacing: 0.02em; }
-  .nav-right { font-size: 13px; color: var(--muted-foreground); }
-  .nav-right a { color: var(--foreground); text-decoration: none; }
+  .nav-logo img { filter: invert(1); }
+  .nav-right { font-size: 13px; color: rgba(255,255,255,0.6); }
+  .nav-right a { color: #fff; text-decoration: none; }
   .nav-right a:hover { text-decoration: underline; }
 
   /* LAYOUT */
@@ -148,7 +153,7 @@
 
   /* AUTH LAYOUT — full-bleed background pattern, form centered in a card on top. */
   body.auth-fullbleed nav { display: none; }
-  .auth-page-bg { min-height: 100vh; background-image: url('/auth-bg-1.png'); background-size: 950px auto; background-repeat: repeat; background-position: center; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .auth-page-bg { min-height: 100vh; background-image: url('/auth-bg-2.png'); background-size: 1725px auto; background-repeat: repeat; background-position: top left; display: flex; align-items: center; justify-content: center; padding: 2rem; }
   .auth-center-card { background: var(--card); border-radius: var(--radius-card); padding: 2.5rem; width: 100%; max-width: 380px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
   .auth-logo { display: flex; justify-content: center; margin-bottom: 1.5rem; }
   .auth-logo img { height: 28px; display: block; }
@@ -367,6 +372,7 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.body.classList.toggle('auth-fullbleed', name === 'login' || name === 'create-account' || name === 'forgot');
+  document.body.classList.toggle('detail-bg', name === 'detail');
 }
 
 function showForgot() { showPage('forgot'); }
