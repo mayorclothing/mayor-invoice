@@ -38,7 +38,7 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--muted); color: var(--foreground); min-height: 100vh; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--muted) url('/auth-bg-2.png') center/950px repeat; color: var(--foreground); min-height: 100vh; }
 
   /* NAV */
   nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 2rem; height: 60px; display: flex; align-items: center; justify-content: space-between; }
@@ -81,6 +81,7 @@
   .badge-shipped   { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
   .badge-delivered { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
   .badge-exception { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+  .badge-purple    { background: #f3e8ff; color: #6b21a8; border-color: #e9d5ff; }
   .badge-unknown   { background: var(--secondary); color: var(--muted-foreground); border-color: var(--border); }
 
   /* ORDER LIST */
@@ -553,8 +554,8 @@ function fmtMoney(n) {
 // old badge-${status.toLowerCase()} approach: the space produced an invalid two-token
 // class name that matched no CSS rule, so the badge silently rendered with no color.
 const STATUS_BADGE_CLASS = {
-  'awaiting approval': 'badge-pending',
-  'awaiting payment': 'badge-pending',
+  'awaiting approval': 'badge-purple',
+  'awaiting payment': 'badge-exception',
   'pending': 'badge-pending',
   'shipped': 'badge-shipped',
   'delivered': 'badge-delivered',
