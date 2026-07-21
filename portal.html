@@ -333,6 +333,18 @@ function togglePw(inputId, toggleId) {
   else { input.type = 'password'; toggle.textContent = 'Show'; }
 }
 
+// Some sheet rows have placeholder text ("35 days after client confirms order")
+// instead of a real ship date -- hides that in the order-row meta line rather
+// than showing it to a customer as if it were a date. Fixing the sheet data is
+// a separate follow-up.
+function isRealDate(dateStr) {
+  if (!dateStr) return false;
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  if (days.some(d => dateStr.startsWith(d))) return true;
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) return true;
+  return !isNaN(new Date(dateStr).getTime());
+}
+
 function formatShipDate(dateStr) {
   if (!dateStr) return '—';
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -497,7 +509,7 @@ async function loadOrders() {
       <div class="order-row" onclick="showOrder(${i})">
         <div>
           <div class="order-title">${esc(o.order_number)}</div>
-          <div class="order-meta">${esc(o.club)}${currentUser.admin && o.email ? ' · ' + esc(o.email) : ''} · ${esc(o.ship_date)}</div>
+          <div class="order-meta">${esc(o.club)}${currentUser.admin && o.email ? ' · ' + esc(o.email) : ''}${isRealDate(o.ship_date) ? ' · ' + esc(o.ship_date) : ''}</div>
         </div>
         <div class="order-right">
           <span class="badge ${statusBadgeClass(o.status)}">${esc(displayStatus(o.status))}</span>
