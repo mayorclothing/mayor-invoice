@@ -4,6 +4,7 @@ const { google } = require('googleapis');
 const { renderInvoicePdf } = require('./doc-render');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 const { router: portalRouter, getOrdersFromSheet } = require('./portal');
 const app = express();
 app.set('trust proxy', 1);
@@ -31,6 +32,20 @@ app.get('/mayor-logo.png', (req, res) => res.sendFile(path.join(__dirname, 'Mayo
 app.get('/auth-bg-1.png', (req, res) => res.sendFile(path.join(__dirname, 'auth-bg-1.png')));
 app.get('/auth-bg-2.png', (req, res) => res.sendFile(path.join(__dirname, 'auth-bg-2.png')));
 app.get('/auth-bg-3.png', (req, res) => res.sendFile(path.join(__dirname, 'auth-bg-3.png')));
+
+// Per-order print swatch, used as the order-detail page background when one exists.
+// Filename = the order number exactly (path.basename strips any traversal attempt),
+// tried against a fixed extension list rather than trusting a client-supplied one.
+const SWATCH_DIR = path.join(__dirname, 'swatches');
+const SWATCH_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
+app.get('/swatches/:orderNumber', (req, res) => {
+  const base = path.basename(req.params.orderNumber).replace(/\.[^.]+$/, '');
+  for (const ext of SWATCH_EXTENSIONS) {
+    const file = path.join(SWATCH_DIR, base + ext);
+    if (fs.existsSync(file)) return res.sendFile(file);
+  }
+  res.status(404).end();
+});
 app.get('/orders', (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'portal.html'));

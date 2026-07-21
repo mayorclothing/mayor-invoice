@@ -57,13 +57,15 @@
   .page.active { display: block; }
   .container { max-width: 680px; margin: 0 auto; padding: 2.5rem 1rem; }
   .container-wide { max-width: 900px; margin: 0 auto; padding: 2.5rem 1rem; }
-  /* These sit directly on the page's dark pattern background (everything else on
-     these two pages is inside a white .card) -- lighten just these, by id/class
-     scoped to avoid affecting any subtitle that ends up inside a card later. */
-  .container-wide h1 { color: #fff; }
-  #orders-club-name, #detail-club { color: rgba(255,255,255,0.7); }
-  .container-wide .back { color: rgba(255,255,255,0.7); }
-  .container-wide .back:hover { color: #fff; }
+  /* These sit directly on the page background -- fixed black/white pattern is
+     one thing, but order-detail's background can become an arbitrary per-order
+     print swatch of unknown color/brightness. A translucent dark backdrop keeps
+     text legible regardless, instead of assuming "background is always dark". */
+  .page-heading { background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); border-radius: var(--radius-control); padding: 14px 18px; margin-bottom: 1.5rem; }
+  .page-heading h1 { color: #fff; margin-bottom: 2px; }
+  #orders-club-name, #detail-club { color: rgba(255,255,255,0.75); }
+  .page-heading .back { color: rgba(255,255,255,0.75); margin-bottom: 10px; }
+  .page-heading .back:hover { color: #fff; }
 
   /* CARDS */
   .card { background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
@@ -264,7 +266,7 @@
 <!-- PAGE: ORDERS LIST -->
 <div class="page" id="page-orders">
   <div class="container-wide">
-    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:1.5rem;">
+    <div class="page-heading" style="display:flex; justify-content:space-between; align-items:flex-end;">
       <div>
         <h1>Your Orders</h1>
         <p class="subtitle" style="margin:0;" id="orders-club-name"></p>
@@ -279,13 +281,15 @@
 <!-- PAGE: ORDER DETAIL -->
 <div class="page" id="page-detail">
   <div class="container-wide">
-    <span class="back" onclick="showPage('orders')">← Back to orders</span>
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem; flex-wrap:wrap; gap:10px;">
-      <div>
-        <h1 id="detail-order-number"></h1>
-        <p class="subtitle" id="detail-club" style="margin:0;"></p>
+    <div class="page-heading">
+      <span class="back" onclick="showPage('orders')">← Back to orders</span>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h1 id="detail-order-number"></h1>
+          <p class="subtitle" id="detail-club" style="margin:0;"></p>
+        </div>
+        <span class="badge" id="detail-status-badge"></span>
       </div>
-      <span class="badge" id="detail-status-badge"></span>
     </div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
@@ -373,6 +377,7 @@ function showPage(name) {
   document.getElementById('page-' + name).classList.add('active');
   document.body.classList.toggle('auth-fullbleed', name === 'login' || name === 'create-account' || name === 'forgot');
   document.body.classList.toggle('detail-bg', name === 'detail');
+  if (name !== 'detail') { document.body.style.backgroundImage = ''; document.body.style.backgroundSize = ''; }
 }
 
 function showForgot() { showPage('forgot'); }
@@ -614,6 +619,18 @@ async function showOrder(idx) {
 
   document.getElementById('detail-order-number').textContent = 'Order: ' + o.order_number;
   document.getElementById('detail-club').textContent = o.club;
+
+  // Per-order print swatch as the page background, when Matt/Marcus has dropped one
+  // in for this order (filename = order number). Falls back to the default black
+  // pattern (detail-bg class) when none exists -- clear any previous order's swatch
+  // first so it doesn't linger while this one loads or if this order has none.
+  document.body.style.backgroundImage = '';
+  const swatchProbe = new Image();
+  swatchProbe.onload = () => {
+    document.body.style.backgroundImage = `url('${swatchProbe.src}')`;
+    document.body.style.backgroundSize = '400px auto';
+  };
+  swatchProbe.src = '/swatches/' + encodeURIComponent(o.order_number);
 
   const badge = document.getElementById('detail-status-badge');
   badge.textContent = displayStatus(o.status);
