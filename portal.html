@@ -151,8 +151,9 @@
   .forgot-link:hover { text-decoration: underline; }
   .auth-bottom { font-size: 13px; color: var(--muted-foreground); text-align: center; margin-top: 16px; }
   .auth-bottom a { color: var(--foreground); text-decoration: underline; }
-  .auth-image-col { flex: 1 1 50%; background: var(--secondary); display: flex; align-items: center; justify-content: center; }
-  .auth-image-mark { width: 96px; opacity: 0.12; }
+  .auth-image-col { flex: 1 1 50%; position: relative; background: #000; overflow: hidden; }
+  .auth-slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity 1.5s ease; }
+  .auth-slide.active { opacity: 1; }
   @media (max-width: 860px) {
     .auth-image-col { display: none; }
     .auth-form-col { flex: 1 1 100%; }
@@ -190,7 +191,11 @@
         <p class="auth-bottom">Don't have an account? <a href="#" onclick="showPage('create-account')">Sign up</a></p>
       </div>
     </div>
-    <div class="auth-image-col"><img class="auth-image-mark" src="/mayor-logo.png" alt="" /></div>
+    <div class="auth-image-col" id="auth-slideshow">
+      <div class="auth-slide active" style="background-image:url('/auth-bg-1.png');"></div>
+      <div class="auth-slide" style="background-image:url('/auth-bg-2.png');"></div>
+      <div class="auth-slide" style="background-image:url('/auth-bg-3.png');"></div>
+    </div>
   </div>
 </div>
 
@@ -353,6 +358,20 @@ function showPage(name) {
 }
 
 function showForgot() { showPage('forgot'); }
+
+// AUTH SLIDESHOW — cross-fades the login page's image panel between
+// auth-bg-1/2/3.png. Runs once on load regardless of which page is active;
+// harmless (and paused-looking) when the login page isn't visible.
+(function initAuthSlideshow() {
+  const slides = document.querySelectorAll('#auth-slideshow .auth-slide');
+  if (!slides.length) return;
+  let i = 0;
+  setInterval(() => {
+    slides[i].classList.remove('active');
+    i = (i + 1) % slides.length;
+    slides[i].classList.add('active');
+  }, 5000);
+})();
 
 // ── AUTH ──
 async function doLogin() {
