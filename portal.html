@@ -500,7 +500,7 @@ async function loadOrders() {
           <div class="order-meta">${esc(o.club)}${currentUser.admin && o.email ? ' · ' + esc(o.email) : ''} · ${esc(o.ship_date)}</div>
         </div>
         <div class="order-right">
-          <span class="badge badge-${esc((o.status||'pending').toLowerCase())}">${esc(displayStatus(o.status))}</span>
+          <span class="badge ${statusBadgeClass(o.status)}">${esc(displayStatus(o.status))}</span>
         </div>
       </div>`).join('');
   } catch(e) {
@@ -535,6 +535,20 @@ function fmtMoney(n) {
   const num = Number(n) || 0;
   const hasCents = Math.round(num * 100) % 100 !== 0;
   return '$' + num.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: 2 });
+}
+
+// Order status -> badge color. Multi-word statuses (e.g. "Awaiting Payment") broke the
+// old badge-${status.toLowerCase()} approach: the space produced an invalid two-token
+// class name that matched no CSS rule, so the badge silently rendered with no color.
+const STATUS_BADGE_CLASS = {
+  'awaiting approval': 'badge-pending',
+  'awaiting payment': 'badge-pending',
+  'pending': 'badge-pending',
+  'shipped': 'badge-shipped',
+  'delivered': 'badge-delivered',
+};
+function statusBadgeClass(status) {
+  return STATUS_BADGE_CLASS[(status || '').toLowerCase()] || 'badge-pending';
 }
 
 // "pending" reads like back-office jargon to a customer — show it as "In Progress".
@@ -575,16 +589,9 @@ async function showOrder(idx) {
   document.getElementById('detail-order-number').textContent = 'Order: ' + o.order_number;
   document.getElementById('detail-club').textContent = o.club;
 
-  const statusColors = {
-    'awaiting approval': 'badge-pending',
-    'awaiting payment': 'badge-pending',
-    'pending': 'badge-pending',
-    'shipped': 'badge-shipped',
-    'delivered': 'badge-delivered'
-  };
   const badge = document.getElementById('detail-status-badge');
   badge.textContent = displayStatus(o.status);
-  badge.className = 'badge ' + (statusColors[(o.status||'').toLowerCase()] || 'badge-pending');
+  badge.className = 'badge ' + statusBadgeClass(o.status);
 
   document.getElementById('detail-info').innerHTML = `
     <div class="detail-row"><span class="detail-key">Order #</span><span class="detail-val">${esc(o.order_number)}</span></div>
