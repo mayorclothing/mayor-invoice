@@ -66,6 +66,13 @@
   #orders-club-name, #detail-club { color: rgba(255,255,255,0.75); }
   .page-heading .back { color: rgba(255,255,255,0.75); margin-bottom: 10px; }
   .page-heading .back:hover { color: #fff; }
+  /* Sampled the swatch as light (most prints are white) -- flip to a frosted-glass
+     light chip with dark text instead of a dark box that reads as mismatched. */
+  .page-heading.on-light { background: rgba(255,255,255,0.65); }
+  .page-heading.on-light h1 { color: var(--foreground); }
+  .page-heading.on-light #detail-club { color: var(--muted-foreground); }
+  .page-heading.on-light .back { color: var(--muted-foreground); }
+  .page-heading.on-light .back:hover { color: var(--foreground); }
 
   /* CARDS */
   .card { background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
@@ -625,10 +632,31 @@ async function showOrder(idx) {
   // pattern (detail-bg class) when none exists -- clear any previous order's swatch
   // first so it doesn't linger while this one loads or if this order has none.
   document.body.style.backgroundImage = '';
+  document.getElementById('page-detail').querySelector('.page-heading').classList.remove('on-light');
   const swatchProbe = new Image();
   swatchProbe.onload = () => {
+    // These swatch files (unlike our own auth-bg patterns) already contain a dense
+    // repeat baked in from Shopify's own render -- tiling them again at a small
+    // CSS size double-repeats the pattern and crowds the print into itself
+    // (reported as "numbers overlapping"). cover/no-repeat shows it as one
+    // continuous swath instead.
     document.body.style.backgroundImage = `url('${swatchProbe.src}')`;
-    document.body.style.backgroundSize = '400px auto';
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundRepeat = 'no-repeat';
+    document.body.style.backgroundPosition = 'center';
+
+    // Most prints are white/light -- a fixed dark heading chip looks like a
+    // mismatched gray box stuck on top. Sample the swatch's average brightness
+    // and flip the chip + text to a light/frosted variant when it's a light print.
+    const c = document.createElement('canvas');
+    c.width = 20; c.height = 20;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(swatchProbe, 0, 0, 20, 20);
+    const px = ctx.getImageData(0, 0, 20, 20).data;
+    let total = 0;
+    for (let i = 0; i < px.length; i += 4) total += (px[i] + px[i+1] + px[i+2]) / 3;
+    const avgBrightness = total / (px.length / 4);
+    document.getElementById('page-detail').querySelector('.page-heading').classList.toggle('on-light', avgBrightness > 180);
   };
   swatchProbe.src = '/swatches/' + encodeURIComponent(o.order_number);
 
