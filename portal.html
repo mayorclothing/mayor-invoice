@@ -644,14 +644,14 @@ async function showOrder(idx) {
   document.querySelectorAll('#page-detail .page-heading, #page-detail .fine-print').forEach(el => el.classList.remove('on-light'));
   const swatchProbe = new Image();
   swatchProbe.onload = () => {
-    // These swatch files (unlike our own auth-bg patterns) already contain a dense
-    // repeat baked in from Shopify's own render -- tiling them again at a small
-    // CSS size double-repeats the pattern and crowds the print into itself
-    // (reported as "numbers overlapping"). cover/no-repeat shows it as one
-    // continuous swath instead.
+    // These swatch files aren't authored as seamless tiles -- CSS repeat at any
+    // size slices through glyphs at each tile boundary, leaving stray fragments
+    // (e.g. a disconnected top-of-the-"2") wherever tiles meet. No repeat means
+    // no boundary for that to happen at, at the cost of only showing one
+    // (already print-dense) instance instead of a repeated field of them.
     document.body.style.backgroundImage = `url('${swatchProbe.src}')`;
-    document.body.style.backgroundSize = '700px auto';
-    document.body.style.backgroundRepeat = 'repeat';
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundRepeat = 'no-repeat';
     document.body.style.backgroundPosition = 'center';
 
     // Most prints are white/light -- a fixed dark heading chip looks like a
