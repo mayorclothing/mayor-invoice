@@ -132,9 +132,34 @@
   .modal-overlay.open { display: flex; }
   .modal { background: var(--card); border-radius: var(--radius-card); padding: 1.5rem; width: 90%; max-width: 440px; }
   .modal h2 { margin-bottom: 1rem; }
+
+  /* AUTH SPLIT LAYOUT — matches shadcn's login-02 block (real component
+     radius, 8px, not the dashboard blocks' exaggerated 26px/pill styling
+     used elsewhere in this file — those come from a different demo surface). */
+  body.auth-fullbleed nav { display: none; }
+  .auth-split { display: flex; min-height: 100vh; }
+  .auth-form-col { flex: 1 1 50%; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .auth-form-wrap { width: 100%; max-width: 340px; }
+  .auth-logo { display: inline-flex; margin-bottom: 2rem; }
+  .auth-logo img { height: 28px; display: block; }
+  .auth-heading { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+  .auth-form-wrap input { border-radius: 8px; }
+  .auth-btn { border-radius: 8px; }
+  .field-label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+  .field-label-row label { margin-bottom: 0; }
+  .forgot-link { font-size: 13px; color: var(--muted-foreground); text-decoration: none; }
+  .forgot-link:hover { text-decoration: underline; }
+  .auth-bottom { font-size: 13px; color: var(--muted-foreground); text-align: center; margin-top: 16px; }
+  .auth-bottom a { color: var(--foreground); text-decoration: underline; }
+  .auth-image-col { flex: 1 1 50%; background: var(--secondary); display: flex; align-items: center; justify-content: center; }
+  .auth-image-mark { width: 96px; opacity: 0.12; }
+  @media (max-width: 860px) {
+    .auth-image-col { display: none; }
+    .auth-form-col { flex: 1 1 100%; }
+  }
 </style>
 </head>
-<body>
+<body class="auth-fullbleed">
 
 <nav>
   <div class="nav-logo"><img src="/mayor-logo.png" alt="Mayor" style="height:36px;" /></div>
@@ -146,27 +171,26 @@
 
 <!-- PAGE: LOGIN -->
 <div class="page active" id="page-login">
-  <div class="container" style="max-width:420px;">
-    <div style="margin-bottom:2rem; margin-top:1rem;">
-      <h1>Sign in to your orders</h1>
-      <p class="subtitle">Enter your email and password to access your order history and invoices.</p>
-    </div>
-    <div class="card">
-      <div id="login-alert"></div>
-      <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" /></div>
-      <div class="field">
-        <label>Password</label>
-        <div style="position:relative;">
-          <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:48px;" />
-          <span onclick="togglePw('login-password','toggle-login')" id="toggle-login" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:12px;">Show</span>
+  <div class="auth-split">
+    <div class="auth-form-col">
+      <div class="auth-form-wrap">
+        <a href="#" class="auth-logo"><img src="/mayor-logo.png" alt="Mayor" /></a>
+        <h1 class="auth-heading">Sign in to your account</h1>
+        <p class="subtitle">Enter your email below to access your order history and invoices.</p>
+        <div id="login-alert"></div>
+        <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" /></div>
+        <div class="field">
+          <div class="field-label-row"><label>Password</label><a href="#" onclick="showForgot()" class="forgot-link">Forgot your password?</a></div>
+          <div style="position:relative;">
+            <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:48px;" />
+            <span onclick="togglePw('login-password','toggle-login')" id="toggle-login" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted-foreground);font-size:12px;">Show</span>
+          </div>
         </div>
-      </div>
-      <button class="btn" onclick="doLogin()" id="login-btn">Sign in</button>
-      <div style="display:flex; justify-content:space-between; margin-top:12px; font-size:13px;">
-        <a href="#" onclick="showForgot()" style="color:#888;">Forgot password?</a>
-        <a href="#" onclick="showPage('create-account')" style="color:#888;">Create account</a>
+        <button class="btn auth-btn" onclick="doLogin()" id="login-btn">Sign in</button>
+        <p class="auth-bottom">Don't have an account? <a href="#" onclick="showPage('create-account')">Sign up</a></p>
       </div>
     </div>
+    <div class="auth-image-col"><img class="auth-image-mark" src="/mayor-logo.png" alt="" /></div>
   </div>
 </div>
 
@@ -325,6 +349,7 @@ function formatShipDate(dateStr) {
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
+  document.body.classList.toggle('auth-fullbleed', name === 'login');
 }
 
 function showForgot() { showPage('forgot'); }
