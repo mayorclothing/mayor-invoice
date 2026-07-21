@@ -99,8 +99,15 @@
   .detail-val { font-weight: 500; text-align: right; }
 
   /* SHIPPING TRACKER */
-  .ups-scan { font-size: 12px; color: var(--muted-foreground); margin-top: 8px; line-height: 1.5; padding-top: 8px; border-top: 1px solid var(--border); }
-  .ups-scan strong { color: var(--foreground); font-weight: 500; }
+  .ups-timeline { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .ups-timeline-row { display: flex; gap: 10px; position: relative; padding-bottom: 14px; }
+  .ups-timeline-row:last-child { padding-bottom: 0; }
+  .ups-timeline-row:not(:last-child)::before { content: ''; position: absolute; left: 3.5px; top: 12px; bottom: 0; width: 1px; background: var(--border); }
+  .ups-timeline-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--border); margin-top: 4px; }
+  .ups-timeline-row.is-latest .ups-timeline-dot { background: var(--primary); }
+  .ups-timeline-desc { font-size: 12px; color: var(--muted-foreground); }
+  .ups-timeline-row.is-latest .ups-timeline-desc { color: var(--foreground); font-weight: 500; }
+  .ups-timeline-meta { font-size: 11px; color: var(--muted-foreground); margin-top: 1px; }
 
   /* ALERTS */
   .alert { padding: 10px 14px; border-radius: var(--radius-control); font-size: 13px; margin-bottom: 14px; }
@@ -596,8 +603,8 @@ async function showOrder(idx) {
       .then(r => r.ok ? r.json() : null)
       .then(t => {
         if (!t) return;
-        const upsDate = t.lastActivity && /^\d{8}$/.test(t.lastActivity.date)
-          ? formatShipDate(`${t.lastActivity.date.slice(0,4)}-${t.lastActivity.date.slice(4,6)}-${t.lastActivity.date.slice(6,8)}`)
+        const fmtUpsDate = (a) => /^\d{8}$/.test(a.date || '')
+          ? formatShipDate(`${a.date.slice(0,4)}-${a.date.slice(4,6)}-${a.date.slice(6,8)}`)
           : '';
         const upsBadgeClass = {
           D: 'badge-delivered',   // Delivered
@@ -606,12 +613,19 @@ async function showOrder(idx) {
           M: 'badge-pending',     // Manifest / label created
           P: 'badge-pending',     // Pickup
         }[t.statusCode] || 'badge-unknown';
-        const scanLine = t.lastActivity
-          ? `<div class="ups-scan"><strong>${esc(t.lastActivity.description)}</strong>${t.lastActivity.location ? ' · ' + esc(t.lastActivity.location) : ''}${upsDate ? ' · ' + esc(upsDate) : ''}</div>`
+        const timelineHTML = (t.activities || []).length
+          ? `<div class="ups-timeline">${t.activities.map((a, i) => `
+              <div class="ups-timeline-row${i === 0 ? ' is-latest' : ''}">
+                <span class="ups-timeline-dot"></span>
+                <div>
+                  <div class="ups-timeline-desc">${esc(a.description)}</div>
+                  <div class="ups-timeline-meta">${[a.location, fmtUpsDate(a)].filter(Boolean).map(esc).join(' · ')}</div>
+                </div>
+              </div>`).join('')}</div>`
           : '';
         document.getElementById('detail-shipping').innerHTML += `
           <div class="detail-row"><span class="detail-key">UPS Status</span><span class="detail-val"><span class="badge ${upsBadgeClass}">${esc(t.status)}</span></span></div>
-          ${scanLine}`;
+          ${timelineHTML}`;
       })
       .catch(() => {});
   }

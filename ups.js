@@ -23,7 +23,9 @@ async function getAccessToken() {
   return cachedToken.access_token;
 }
 
-// Returns { status, statusCode, lastActivity: { description, location, date } } or null if UPS has no data yet.
+// Returns { status, statusCode, lastActivity, activities } or null if UPS has no data yet.
+// `activities` is the recent scan history (newest first, capped at 5) for a shipping
+// timeline; `lastActivity` is kept as activities[0] for existing callers.
 async function trackPackage(trackingNumber) {
   const token = await getAccessToken();
   const res = await fetch(`${BASE}/api/track/v1/details/${encodeURIComponent(trackingNumber)}`, {
@@ -40,15 +42,19 @@ async function trackPackage(trackingNumber) {
   const pkg = data?.trackResponse?.shipment?.[0]?.package?.[0];
   if (!pkg) return null;
 
-  const activity = pkg.activity?.[0];
+  const toActivity = (a) => ({
+    description: a.status?.description || '',
+    location: [a.location?.address?.city, a.location?.address?.stateProvince].filter(Boolean).join(', '),
+    date: a.date || '',
+    time: a.time || '',
+  });
+  const activities = (pkg.activity || []).slice(0, 5).map(toActivity);
+
   return {
     status: pkg.currentStatus?.description || 'Unknown',
     statusCode: pkg.currentStatus?.code || '',
-    lastActivity: activity ? {
-      description: activity.status?.description || '',
-      location: [activity.location?.address?.city, activity.location?.address?.stateProvince].filter(Boolean).join(', '),
-      date: activity.date || '',
-    } : null,
+    lastActivity: activities[0] || null,
+    activities,
   };
 }
 
