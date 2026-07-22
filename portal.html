@@ -647,47 +647,16 @@ async function showOrder(idx) {
   document.getElementById('detail-order-number').textContent = 'Order: ' + o.order_number;
   document.getElementById('detail-club').textContent = o.club;
 
-  // Per-order print swatch as the page background, when Matt/Marcus has dropped one
-  // in for this order (filename = order number). Falls back to the default black
-  // pattern (detail-bg class) when none exists -- clear any previous order's swatch
-  // first so it doesn't linger while this one loads or if this order has none.
+  // Per-order print background, when Matt/Marcus has one for this order --
+  // sourced from the sheet's own Print Background column (a Shopify CDN URL,
+  // resolved server-side by /portal/order-detail, falling back to the local
+  // swatches/ file convention only if the sheet cell is blank). Falls back to
+  // the default black pattern (detail-bg class) when neither exists -- clear
+  // any previous order's background first so it doesn't linger while this one
+  // loads or if this order has none. The actual image isn't known until the
+  // order-detail fetch below resolves, so this only clears state here.
   document.body.style.backgroundImage = '';
   document.querySelectorAll('#page-detail .page-heading, #page-detail .fine-print').forEach(el => el.classList.remove('on-light'));
-  const swatchProbe = new Image();
-  swatchProbe.onload = () => {
-    // These swatch files aren't authored as seamless tiles -- CSS repeat at any
-    // size slices through glyphs at each tile boundary, leaving stray fragments
-    // (e.g. a disconnected top-of-the-"2") wherever tiles meet. No repeat means
-    // no boundary for that to happen at, at the cost of only showing one
-    // (already print-dense) instance instead of a repeated field of them.
-    // Sample the swatch's average color first (same-origin canvas read, no CORS
-    // issue) -- used two ways: (1) light/dark heading-chip variant, since most
-    // prints are white and a fixed dark chip looked like a mismatched box, and
-    // (2) as the page's background-color fallback, so shrinking the image below
-    // "cover" (to "zoom out" -- show more of the print's own internal repeat
-    // instead of cropping in tight) exposes matching color at the edges instead
-    // of a jarring black gap, without needing CSS repeat (which slices glyphs at
-    // tile boundaries -- see the removed tiling code this replaced).
-    const c = document.createElement('canvas');
-    c.width = 20; c.height = 20;
-    const ctx = c.getContext('2d');
-    ctx.drawImage(swatchProbe, 0, 0, 20, 20);
-    const px = ctx.getImageData(0, 0, 20, 20).data;
-    let r = 0, g = 0, b = 0;
-    for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i+1]; b += px[i+2]; }
-    const n = px.length / 4;
-    r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
-    const avgBrightness = (r + g + b) / 3;
-
-    document.body.style.backgroundImage = `url('${swatchProbe.src}')`;
-    document.body.style.backgroundColor = `rgb(${r},${g},${b})`;
-    document.body.style.backgroundSize = 'cover';
-    document.body.style.backgroundRepeat = 'no-repeat';
-    document.body.style.backgroundPosition = 'center';
-
-    document.querySelectorAll('#page-detail .page-heading, #page-detail .fine-print').forEach(el => el.classList.toggle('on-light', avgBrightness > 180));
-  };
-  swatchProbe.src = '/swatches/' + encodeURIComponent(o.order_number);
 
   const badge = document.getElementById('detail-status-badge');
   badge.textContent = displayStatus(o.status);
@@ -747,6 +716,58 @@ async function showOrder(idx) {
     const res = await fetch('/portal/order-detail/' + encodeURIComponent(o.order_number), { credentials: 'include' });
     if (!res.ok) throw new Error('Details not available');
     const d = await res.json();
+
+    // Only now do we know the real background (sheet's Print Background column,
+    // or its local swatches/ fallback -- both already resolved server-side into
+    // d.print_background). Bail out silently if this order has none, or if the
+    // page has since navigated away from this order (avoids a slow image load
+    // clobbering whatever the user clicked into next).
+    // Unlike other sheet-sourced links, this one may legitimately be a relative
+    // same-origin path (the local swatches/ fallback), not just an absolute
+    // https URL -- safeUrl() alone would reject that.
+    const bgUrl = /^\//.test(d.print_background || '') ? d.print_background : safeUrl(d.print_background);
+    if (bgUrl && currentOrder === o) {
+      const swatchProbe = new Image();
+      swatchProbe.crossOrigin = 'anonymous'; // needed for canvas sampling below on cross-origin (Shopify CDN) URLs
+      swatchProbe.onload = () => {
+        if (currentOrder !== o) return; // navigated away while this was loading
+        // These prints aren't authored as seamless tiles -- CSS repeat at any
+        // size slices through glyphs at each tile boundary, leaving stray
+        // fragments (e.g. a disconnected top-of-the-"2") wherever tiles meet.
+        // No repeat means no boundary for that to happen at, at the cost of
+        // only showing one (already print-dense) instance instead of a
+        // repeated field of them.
+        document.body.style.backgroundImage = `url('${bgUrl}')`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundRepeat = 'no-repeat';
+        document.body.style.backgroundPosition = 'center';
+
+        // Sample the swatch's average color -- used two ways: (1) light/dark
+        // heading-chip variant, since most prints are white and a fixed dark
+        // chip looked like a mismatched box, and (2) as the page's
+        // background-color fallback, so shrinking the image below "cover"
+        // (to "zoom out" -- show more of the print's own internal repeat
+        // instead of cropping in tight) exposes matching color at the edges
+        // instead of a jarring black gap. Wrapped separately from the image
+        // itself: a CORS-blocked canvas read shouldn't take the background
+        // down with it, just skip the color-matched chip styling.
+        try {
+          const c = document.createElement('canvas');
+          c.width = 20; c.height = 20;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(swatchProbe, 0, 0, 20, 20);
+          const px = ctx.getImageData(0, 0, 20, 20).data;
+          let r = 0, g = 0, b = 0;
+          for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i+1]; b += px[i+2]; }
+          const n = px.length / 4;
+          r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+          const avgBrightness = (r + g + b) / 3;
+          document.body.style.backgroundColor = `rgb(${r},${g},${b})`;
+          document.querySelectorAll('#page-detail .page-heading, #page-detail .fine-print').forEach(el => el.classList.toggle('on-light', avgBrightness > 180));
+        } catch (e) {}
+      };
+      swatchProbe.src = bgUrl;
+    }
 
     document.getElementById('detail-items-label').textContent =
       'Order Details';
