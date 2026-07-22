@@ -4,8 +4,25 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { google } = require('googleapis');
 const path = require('path');
+const fs = require('fs');
 const { trackPackage } = require('./ups');
 const router = express.Router();
+
+// Mirrors index.js's SWATCH_DIR/SWATCH_EXTENSIONS + /swatches/:orderNumber route —
+// keep in lockstep if that route's naming convention changes. No HubSpot property
+// for print_background exists yet (see hermesMapping.js), so the sheet's own
+// column stays blank; this backfills it from the file-based swatch convention
+// mayor-invoice already serves the portal background from.
+const SWATCH_DIR = path.join(__dirname, 'swatches');
+const SWATCH_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
+function swatchUrlFor(orderNumber) {
+  const base = path.basename(String(orderNumber || '')).replace(/\.[^.]+$/, '');
+  if (!base) return '';
+  for (const ext of SWATCH_EXTENSIONS) {
+    if (fs.existsSync(path.join(SWATCH_DIR, base + ext))) return `/swatches/${orderNumber}`;
+  }
+  return '';
+}
 router.use(express.json());
 const escHtml = (v) => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
@@ -275,7 +292,11 @@ async function getOrderDetailData(order_number) {
   const invRows = invRes.data.values || [];
   const target = normalizeOrderNumber(order_number);
   const invRow = invRows.find(r => r[5] && normalizeOrderNumber(r[5]) === target);
-  if (invRow) return { ...parseSheetRow(invRow), source: 'invoice' };
+  if (invRow) {
+    const detail = parseSheetRow(invRow);
+    detail.print_background = detail.print_background || swatchUrlFor(detail.order_number);
+    return { ...detail, source: 'invoice' };
+  }
 
   // Fall back to Order Confirmations
   const confRes = await sheets.spreadsheets.values.get({
@@ -284,7 +305,11 @@ async function getOrderDetailData(order_number) {
   });
   const confRows = confRes.data.values || [];
   const confRow = confRows.find(r => r[5] && normalizeOrderNumber(r[5]) === target);
-  if (confRow) return { ...parseSheetRow(confRow), source: 'confirmation' };
+  if (confRow) {
+    const detail = parseSheetRow(confRow);
+    detail.print_background = detail.print_background || swatchUrlFor(detail.order_number);
+    return { ...detail, source: 'confirmation' };
+  }
 
   return null;
 }
@@ -542,4 +567,4 @@ router.post('/reorder', requireAuth, async (req, res) => {
   }
 });
 
-module.exports = { router, getOrdersFromSheet };
+module.exports = { router, getOrdersFromSheet, swatchUrlFor };
