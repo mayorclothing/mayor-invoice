@@ -15,6 +15,14 @@ function sheetSafe(v) {
   return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
 }
 
+// Order numbers are the lookup key everywhere below. A stray leading/trailing space
+// on one sheet row (e.g. a copy-paste error) makes it fail every === comparison
+// silently instead of erroring — normalize on every read/compare so that class of
+// bug can't hide a duplicate/orphaned row again.
+function normalizeOrderNumber(v) {
+  return String(v || '').trim().replace(/\s+/g, ' ');
+}
+
 // Minimal in-memory rate limiter (per client IP + route). Fail-open on restart is fine.
 const _rlBuckets = new Map();
 function rateLimit(max, windowMs) {
@@ -76,7 +84,7 @@ async function getOrdersFromSheet(email) {
   return rows.slice(1)
     .filter(r => emailInList(r[1], email))
     .map(r => ({
-      order_number:    r[0] || '',
+      order_number:    normalizeOrderNumber(r[0]),
       email:           r[1] || '',
       club:            r[2] || '',
       ship_date:       r[3] || '',
@@ -86,7 +94,11 @@ async function getOrdersFromSheet(email) {
     }));
 }
 
-// Every order in the sheet — used for the admin (all-orders) view.
+// Every order in the sheet — used for the admin (all-orders) view. Also flags
+// data-integrity issues an admin should know about: duplicate order numbers
+// (see the "Oklahoma City Golf & Country Club I" incident), missing tracking
+// on shipped orders, and missing customer email (blocks that order from ever
+// showing up for a customer login).
 async function getAllOrdersFromSheet() {
   const sheets = await getSheets();
   const res = await sheets.spreadsheets.values.get({
@@ -94,10 +106,10 @@ async function getAllOrdersFromSheet() {
     range: 'Order Info!A:H',
   });
   const rows = res.data.values || [];
-  return rows.slice(1)
+  const orders = rows.slice(1)
     .filter(r => r[0])
     .map(r => ({
-      order_number:    r[0] || '',
+      order_number:    normalizeOrderNumber(r[0]),
       email:           r[1] || '',
       club:            r[2] || '',
       ship_date:       r[3] || '',
@@ -105,6 +117,16 @@ async function getAllOrdersFromSheet() {
       tracking_number: r[5] || '',
       date_delivered:  r[6] || '',
     }));
+
+  const counts = new Map();
+  orders.forEach(o => counts.set(o.order_number, (counts.get(o.order_number) || 0) + 1));
+  const shippedStatuses = ['shipped', 'delivered'];
+  orders.forEach(o => {
+    o.duplicate = counts.get(o.order_number) > 1;
+    o.missing_tracking = shippedStatuses.includes(String(o.status).toLowerCase()) && !o.tracking_number;
+    o.missing_email = !o.email;
+  });
+  return orders;
 }
 
 async function getUserFromSheet(email) {
@@ -203,7 +225,7 @@ function parseSheetRow(row) {
   const artNum = artRaw ? parseCurrency(artRaw) : null;
 
   return {
-    order_number:      row[0]  || '',
+    order_number:      normalizeOrderNumber(row[0]),
     customer_email:    row[1]  || '',
     club:              row[2]  || '',
     address:           row[3]  || '',
@@ -239,7 +261,8 @@ async function getOrderDetailData(order_number) {
     range: 'Invoices!A:AV',
   });
   const invRows = invRes.data.values || [];
-  const invRow = invRows.find(r => r[0] && r[0] === order_number);
+  const target = normalizeOrderNumber(order_number);
+  const invRow = invRows.find(r => r[0] && normalizeOrderNumber(r[0]) === target);
   if (invRow) return { ...parseSheetRow(invRow), source: 'invoice' };
 
   // Fall back to Order Confirmations
@@ -248,7 +271,7 @@ async function getOrderDetailData(order_number) {
     range: 'Order Confirmations!A:AV',
   });
   const confRows = confRes.data.values || [];
-  const confRow = confRows.find(r => r[0] && r[0] === order_number);
+  const confRow = confRows.find(r => r[0] && normalizeOrderNumber(r[0]) === target);
   if (confRow) return { ...parseSheetRow(confRow), source: 'confirmation' };
 
   return null;
@@ -397,7 +420,7 @@ router.get('/order-detail/:order_number', requireAuth, async (req, res) => {
   try {
     if (!req.user.admin) {
       const orders = await getOrdersFromSheet(req.user.email);
-      if (!orders.find(o => o.order_number === req.params.order_number)) return res.status(403).json({ error: 'Not authorized' });
+      if (!orders.find(o => o.order_number === normalizeOrderNumber(req.params.order_number))) return res.status(403).json({ error: 'Not authorized' });
     }
     const detail = await getOrderDetailData(req.params.order_number);
     if (!detail) return res.status(404).json({ error: 'Order details not available yet' });
@@ -412,7 +435,7 @@ router.get('/order-detail/:order_number', requireAuth, async (req, res) => {
 router.get('/tracking/:order_number', requireAuth, async (req, res) => {
   try {
     const orders = req.user.admin ? await getAllOrdersFromSheet() : await getOrdersFromSheet(req.user.email);
-    const order = orders.find(o => o.order_number === req.params.order_number);
+    const order = orders.find(o => o.order_number === normalizeOrderNumber(req.params.order_number));
     if (!order) return res.status(403).json({ error: 'Not authorized' });
     if (!order.tracking_number) return res.status(404).json({ error: 'No tracking number yet' });
 
@@ -430,7 +453,7 @@ router.get('/confirmation/:order_number', requireAuth, async (req, res) => {
   try {
     if (!req.user.admin) {
       const orders = await getOrdersFromSheet(req.user.email);
-      if (!orders.find(o => o.order_number === req.params.order_number)) return res.status(403).json({ error: 'Not authorized' });
+      if (!orders.find(o => o.order_number === normalizeOrderNumber(req.params.order_number))) return res.status(403).json({ error: 'Not authorized' });
     }
 
     const sheets = await getSheets();
@@ -441,7 +464,7 @@ router.get('/confirmation/:order_number', requireAuth, async (req, res) => {
       // columns AL onward; a narrower range silently dropped them from the PDF.
       range: 'Order Confirmations!A:AV',
     });
-    const confRow = (confRes.data.values || []).find(r => r[0] && r[0] === req.params.order_number);
+    const confRow = (confRes.data.values || []).find(r => r[0] && normalizeOrderNumber(r[0]) === normalizeOrderNumber(req.params.order_number));
     if (!confRow) return res.status(404).json({ error: 'Order confirmation not available.' });
 
     const confData = parseSheetRow(confRow);
@@ -475,7 +498,7 @@ router.get('/invoice/:order_number', requireAuth, async (req, res) => {
       spreadsheetId: SHEET_ID,
       range: 'Invoices!A:AV', // see comment on the Order Confirmations read above
     });
-    const invRow = (invRes.data.values || []).find(r => r[0] && r[0] === req.params.order_number);
+    const invRow = (invRes.data.values || []).find(r => r[0] && normalizeOrderNumber(r[0]) === normalizeOrderNumber(req.params.order_number));
     if (!invRow) return res.status(404).json({ error: 'Invoice not available yet. Your order confirmation is still being reviewed.' });
 
     const invoiceData = parseSheetRow(invRow);

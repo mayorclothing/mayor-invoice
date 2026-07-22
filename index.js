@@ -57,6 +57,9 @@ const LOGO_PATH = __dirname + '/Mayor_Logo_transparent.png';
 
 // ---- /generate hardening (this endpoint is browser-reachable and writes to the sheet) ----
 function sheetSafe(v) { if (typeof v !== 'string') return v; return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v; }
+// See matching comment in portal.js — order numbers are the lookup key for every
+// sheet write below; normalize so a stray space can't create a duplicate row.
+function normalizeOrderNumber(v) { return String(v || '').trim().replace(/\s+/g, ' '); }
 // Payment links must be on a trusted host (blocks payment-link fraud). Extend as needed.
 const TRUSTED_PAYMENT_HOSTS = (process.env.TRUSTED_PAYMENT_HOSTS || 'nickelpayments.com,mayorclothing.com')
   .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
@@ -143,7 +146,7 @@ async function appendOrderToSheet(data) {
       const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tabName}!A:A` });
       const col = res.data.values || [];
       // Check if order already exists (skip row 0 which is header)
-      const existingIdx = col.findIndex((r, i) => i > 0 && String(r[0]) === String(orderNumber));
+      const existingIdx = col.findIndex((r, i) => i > 0 && normalizeOrderNumber(r[0]) === normalizeOrderNumber(orderNumber));
       let targetRow;
       if (existingIdx > 0) {
         targetRow = existingIdx + 1; // 1-based
@@ -172,8 +175,8 @@ async function appendOrderToSheet(data) {
     if (isConfirmation) {
       // Write to Order Info if new order
       const existingRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:A' });
-      const existingOrders = (existingRows.data.values || []).map(r => String(r[0] || ''));
-      if (!existingOrders.includes(String(data.order_number))) {
+      const existingOrders = (existingRows.data.values || []).map(r => normalizeOrderNumber(r[0]));
+      if (!existingOrders.includes(normalizeOrderNumber(data.order_number))) {
         await writeToSheet('Order Info',  data.order_number,
           [data.order_number || '', data.customer_email || '', data.club || '',
            data.ship_date || '', 'Awaiting Approval', '', '', ''].map(sheetSafe));
@@ -195,7 +198,7 @@ async function appendOrderToSheet(data) {
       // Update Order Info status to Awaiting Payment
       const orderRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:A' });
       const orderData = orderRows.data.values || [];
-      const orderIdx = orderData.findIndex((r, i) => i > 0 && String(r[0]) === String(data.order_number));
+      const orderIdx = orderData.findIndex((r, i) => i > 0 && normalizeOrderNumber(r[0]) === normalizeOrderNumber(data.order_number));
       if (orderIdx > 0) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: SHEET_ID, range: `Order Info!E${orderIdx + 1}`,

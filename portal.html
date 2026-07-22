@@ -379,11 +379,10 @@ function isRealDate(dateStr) {
 }
 
 function formatShipDate(dateStr) {
-  if (!dateStr) return '—';
+  if (!isRealDate(dateStr)) return '—';
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   if (days.some(d => dateStr.startsWith(d))) return dateStr;
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   return days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
 }
@@ -547,6 +546,7 @@ async function loadOrders() {
           <div class="order-meta">${esc(o.club)}${currentUser.admin && o.email ? ' · ' + esc(o.email) : ''}${isRealDate(o.ship_date) ? ' · ' + esc(o.ship_date) : ''}</div>
         </div>
         <div class="order-right">
+          ${currentUser.admin ? adminFlagBadges(o) : ''}
           <span class="badge ${statusBadgeClass(o.status)}">${esc(displayStatus(o.status))}</span>
         </div>
       </div>`).join('');
@@ -596,6 +596,17 @@ const STATUS_BADGE_CLASS = {
 };
 function statusBadgeClass(status) {
   return STATUS_BADGE_CLASS[(status || '').toLowerCase()] || 'badge-pending';
+}
+
+// Admin-only data-integrity flags surfaced from getAllOrdersFromSheet — catches the
+// class of bug where a bad sheet row (e.g. duplicate order number) silently sits
+// unnoticed until a customer hits it.
+function adminFlagBadges(o) {
+  const flags = [];
+  if (o.duplicate) flags.push(['badge-exception', 'Duplicate #']);
+  if (o.missing_email) flags.push(['badge-exception', 'No email']);
+  if (o.missing_tracking) flags.push(['badge-pending', 'No tracking']);
+  return flags.map(([cls, label]) => `<span class="badge ${cls}" style="margin-right:6px;">${label}</span>`).join('');
 }
 
 // "pending" reads like back-office jargon to a customer — show it as "In Progress".
