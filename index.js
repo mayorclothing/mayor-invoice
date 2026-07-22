@@ -117,41 +117,39 @@ async function appendOrderToSheet(data) {
 
     const items = data.line_items || [];
     const get = (i, key) => items[i] ? (items[i][key] || '') : '';
-    // HubSpot-mirrored layout, 4 blocks (A..BA, 53 cols). Must match, exactly:
-    // portal.js parseSheetRow (read) and mayor-email-backend googleStore.js buildDetailRow (the other writer).
+    const subtotalQty = data.subtotal_quantity != null ? data.subtotal_quantity : items.reduce((s, li) => s + (Number(li.quantity) || 0), 0);
+    // Deals-tab-mirrored layout (A..BF, 58 cols) — Order Number lives at F=5, not
+    // A (Deal ID takes A here; this writer has none, so it's left blank). Must
+    // match, exactly: portal.js parseSheetRow (read) and mayor-email-backend
+    // googleStore.js buildDetailRow (the other writer).
     const rowData = [
-      // Block 1 — HubSpot single-value (A–I)
-      data.order_number || '', data.club || '', data.address || '',
-      data.shipping_address || '', data.ship_date || '', data.payment_link || '',
-      data.payment_link_2 || '', data.customer_email || '', data.product_page || '',
-      // Block 2 — line items, field-type grouped (J–AH): products, descriptions, sizes, quantities, prices
-      get(0,'url'), get(1,'url'), get(2,'url'), get(3,'url'), get(4,'url'),
-      get(0,'description'), get(1,'description'), get(2,'description'), get(3,'description'), get(4,'description'),
-      get(0,'sizes'), get(1,'sizes'), get(2,'sizes'), get(3,'sizes'), get(4,'sizes'),
-      get(0,'quantity'), get(1,'quantity'), get(2,'quantity'), get(3,'quantity'), get(4,'quantity'),
-      get(0,'price'), get(1,'price'), get(2,'price'), get(3,'price'), get(4,'price'),
-      // Block 3 — remaining HubSpot single-value (AI–AN)
+      data.deal_id || '', data.deal_name || '', data.deal_stage || '', data.tracking_number || '',
+      data.customer_email || '', data.order_number || '', data.product_page || '',
+      data.print_background || '',
+      data.club || '', data.shipping_address || '', data.address || '',
+      data.ship_date || '', data.in_hand_date || '', data.payment_terms || '',
+      get(0,'url'), get(0,'description'), get(0,'sizes'), get(0,'quantity'), get(0,'price'),
+      get(1,'url'), get(1,'description'), get(1,'sizes'), get(1,'quantity'), get(1,'price'),
+      get(2,'url'), get(2,'description'), get(2,'sizes'), get(2,'quantity'), get(2,'price'),
+      get(3,'url'), get(3,'description'), get(3,'sizes'),
+      get(4,'url'), get(4,'description'), get(4,'sizes'),
+      get(3,'quantity'), get(3,'price'), get(4,'quantity'), get(4,'price'),
+      subtotalQty || '', data.subtotal || '',
       data.embroidery || '',
       (data.art_setup != null ? parseFloat(String(data.art_setup).replace(/[$,\s]/g,'')) || '' : ''),
-      data.sample_reimbursement || '',
-      data.custom_label || '',
-      data.shipping || '',
-      data.payment_terms || '',
-      // Block 4 — portal/computed-only (AO–BA)
-      data.subtotal || '',
-      data.total || '',
-      data.date_label || 'Ship Date',
-      data.strike_embroidery ? '1' : '',
-      data.strike_art ? '1' : '',
-      data.strike_shipping ? '1' : '',
+      data.sample_reimbursement || '', data.custom_label || '', data.shipping || '', data.total || '',
+      data.payment_link || '', data.payment_link_2 || '',
+      data.strike_embroidery ? '1' : '', data.strike_art ? '1' : '', data.strike_shipping ? '1' : '',
       get(0,'orig_price') || '', get(1,'orig_price') || '', get(2,'orig_price') || '', get(3,'orig_price') || '', get(4,'orig_price') || '',
-      data.in_hand_date || '', // AZ=51
-      '', // BA=52 drive_pdf_link — set by the backend's Drive upload; blank when written here
+      '', // BF=57 drive_pdf_link — set by the backend's Drive upload; blank when written here
     ];
 
     // Helper: find next empty row in column A (after header), then write rowData there
     async function writeToSheet(tabName, orderNumber, rowData) {
-      const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tabName}!A:A` });
+      // Order Info keys on column A; Order Confirmations/Invoices key on F
+      // (Order Number, per the Deals-mirrored layout — Deal ID takes column A there).
+      const keyCol = tabName === 'Order Info' ? 'A' : 'F';
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tabName}!${keyCol}:${keyCol}` });
       const col = res.data.values || [];
       // Check if order already exists (skip row 0 which is header)
       const existingIdx = col.findIndex((r, i) => i > 0 && normalizeOrderNumber(r[0]) === normalizeOrderNumber(orderNumber));

@@ -188,28 +188,29 @@ function parseCurrency(val) {
 
 function parseSheetRow(row) {
   if (!row) return null;
-  // Column mapping (0-indexed) — HubSpot-mirrored layout, 4 blocks (A..BA).
-  // Block 1 — HubSpot single-value (A–I):
-  //   0 A  order_number      1 B  club              2 C  address
-  //   3 D  shipping_address  4 E  ship_date         5 F  payment_link
-  //   6 G  payment_link_2    7 H  customer_email    8 I  product_page
-  // Block 2 — line items, field-type grouped (J–AH):
-  //   9–13  J–N   product_1..5 (item url)   14–18  O–S   description_1..5
-  //  19–23  T–X   sizes_1..5                24–28  Y–AC  quantity_1..5
-  //  29–33  AD–AH price_1..5
-  // Block 3 — remaining HubSpot single-value (AI–AN):
-  //  34 AI embroidery  35 AJ art_setup  36 AK sample_reimbursement
-  //  37 AL custom_label 38 AM shipping  39 AN payment_terms
-  // Block 4 — portal/computed-only (AO–BA):
-  //  40 AO subtotal 41 AP total 42 AQ date_label
-  //  43 AR strike_embroidery 44 AS strike_art 45 AT strike_shipping
-  //  46–50 AU–AY orig_price_1..5  51 AZ in_hand_date  52 BA drive_pdf_link
-  const PRODUCT_IDX = [9, 10, 11, 12, 13];
-  const DESC_IDX    = [14, 15, 16, 17, 18];
-  const SIZES_IDX   = [19, 20, 21, 22, 23];
-  const QTY_IDX     = [24, 25, 26, 27, 28];
-  const PRICE_IDX   = [29, 30, 31, 32, 33];
-  const ORIG_IDX    = [46, 47, 48, 49, 50];
+  // Column mapping (0-indexed) — mirrors the HubSpot "Deals" tab's column order
+  // and names exactly, with print_background inserted after product_page,
+  // payment_link_2 inserted after payment_link, and orig_price x5/drive_pdf_link
+  // appended at the end (fields the Deals tab has no slot for). Order Number
+  // lives at F=5 — Deal ID takes column A here, not order_number.
+  //  0 A deal_id        1 B deal_name       2 C deal_stage    3 D tracking_number
+  //  4 E customer_email 5 F order_number    6 G product_page  7 H print_background
+  //  8 I club           9 J shipping_address 10 K address     11 L ship_date
+  // 12 M in_hand_date  13 N payment_terms
+  // 14–38: product/description/sizes/quantity/price x5, mirroring the Deals tab's
+  // own quirky ordering (slots 4/5 group product/description/sizes together,
+  // then their quantity/price come after slot 5's sizes).
+  // 39 AN subtotal_quantity 40 AO subtotal  41 AP embroidery  42 AQ art_setup
+  // 43 AR sample_reimbursement 44 AS custom_label 45 AT shipping 46 AU total
+  // 47 AV payment_link  48 AW payment_link_2
+  // 49 AX strike_embroidery 50 AY strike_art 51 AZ strike_shipping
+  // 52–56 BA–BE orig_price_1..5  57 BF drive_pdf_link
+  const PRODUCT_IDX = [14, 19, 24, 29, 32];
+  const DESC_IDX    = [15, 20, 25, 30, 33];
+  const SIZES_IDX   = [16, 21, 26, 31, 34];
+  const QTY_IDX      = [17, 22, 27, 35, 37];
+  const PRICE_IDX    = [18, 23, 28, 36, 38];
+  const ORIG_IDX    = [52, 53, 54, 55, 56];
   const items = [];
   for (let i = 0; i < 5; i++) {
     const qty   = parseCurrency(row[QTY_IDX[i]]);
@@ -228,33 +229,37 @@ function parseSheetRow(row) {
     }
   }
 
-  const artRaw = row[35] || null;
+  const artRaw = row[42] || null;
   const artNum = artRaw ? parseCurrency(artRaw) : null;
 
   return {
-    order_number:      normalizeOrderNumber(row[0]),
-    club:              row[1]  || '',
-    address:           row[2]  || '',
-    shipping_address:  row[3]  || '',
-    ship_date:         row[4]  || '',
-    payment_link:      row[5]  || '',
-    payment_link_2:    row[6]  || '',
-    customer_email:    row[7]  || '',
-    product_page:      row[8]  || '',
+    deal_id:           row[0]  || '',
+    deal_name:         row[1]  || '',
+    deal_stage:        row[2]  || '',
+    tracking_number:   row[3]  || '',
+    order_number:      normalizeOrderNumber(row[5]),
+    product_page:      row[6]  || '',
+    print_background:  row[7]  || '',
+    club:              row[8]  || '',
+    shipping_address:  row[9]  || '',
+    address:           row[10] || '',
+    ship_date:         row[11] || '',
+    in_hand_date:      row[12] || '',
+    payment_terms:     row[13] || '',
+    customer_email:    row[4]  || '',
     line_items:        items,
-    embroidery:        parseCurrency(row[34]),
-    art_setup:         artNum,
-    sample_reimbursement: row[36] || null,
-    custom_label:      row[37] ? parseCurrency(row[37]) : null,
-    shipping:          parseCurrency(row[38]),
-    payment_terms:     row[39] || '',
     subtotal:          parseCurrency(row[40]),
-    total:             parseCurrency(row[41]),
-    date_label:        row[42] || 'Ship Date',
-    strike_embroidery: row[43] !== undefined && row[43] !== '' ? row[43] === '1' : true,
-    strike_art:        row[44] !== undefined && row[44] !== '' ? row[44] === '1' : true,
-    strike_shipping:   row[45] !== undefined && row[45] !== '' ? row[45] === '1' : false,
-    in_hand_date:      row[51] || '',
+    embroidery:        parseCurrency(row[41]),
+    art_setup:         artNum,
+    sample_reimbursement: row[43] || null,
+    custom_label:      row[44] ? parseCurrency(row[44]) : null,
+    shipping:          parseCurrency(row[45]),
+    total:             parseCurrency(row[46]),
+    payment_link:      row[47] || '',
+    payment_link_2:    row[48] || '',
+    strike_embroidery: row[49] !== undefined && row[49] !== '' ? row[49] === '1' : true,
+    strike_art:        row[50] !== undefined && row[50] !== '' ? row[50] === '1' : true,
+    strike_shipping:   row[51] !== undefined && row[51] !== '' ? row[51] === '1' : false,
   };
 }
 
@@ -265,20 +270,20 @@ async function getOrderDetailData(order_number) {
   // Try Invoices sheet first
   const invRes = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Invoices!A:BA',
+    range: 'Invoices!A:BF',
   });
   const invRows = invRes.data.values || [];
   const target = normalizeOrderNumber(order_number);
-  const invRow = invRows.find(r => r[0] && normalizeOrderNumber(r[0]) === target);
+  const invRow = invRows.find(r => r[5] && normalizeOrderNumber(r[5]) === target);
   if (invRow) return { ...parseSheetRow(invRow), source: 'invoice' };
 
   // Fall back to Order Confirmations
   const confRes = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Order Confirmations!A:BA',
+    range: 'Order Confirmations!A:BF',
   });
   const confRows = confRes.data.values || [];
-  const confRow = confRows.find(r => r[0] && normalizeOrderNumber(r[0]) === target);
+  const confRow = confRows.find(r => r[5] && normalizeOrderNumber(r[5]) === target);
   if (confRow) return { ...parseSheetRow(confRow), source: 'confirmation' };
 
   return null;
@@ -466,12 +471,12 @@ router.get('/confirmation/:order_number', requireAuth, async (req, res) => {
     const sheets = await getSheets();
     const confRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      // Full range through BA — parseSheetRow reads Block 3/4 fields (embroidery,
-      // payment_terms, sizes, orig_price, in_hand_date, drive_pdf_link, etc.) from
-      // columns AI onward; a narrower range silently dropped them from the PDF.
-      range: 'Order Confirmations!A:BA',
+      // Full range through BF — parseSheetRow reads fields (embroidery, payment_terms,
+      // sizes, orig_price, drive_pdf_link, etc.) from columns well past the line
+      // items; a narrower range silently dropped them from the PDF.
+      range: 'Order Confirmations!A:BF',
     });
-    const confRow = (confRes.data.values || []).find(r => r[0] && normalizeOrderNumber(r[0]) === normalizeOrderNumber(req.params.order_number));
+    const confRow = (confRes.data.values || []).find(r => r[5] && normalizeOrderNumber(r[5]) === normalizeOrderNumber(req.params.order_number));
     if (!confRow) return res.status(404).json({ error: 'Order confirmation not available.' });
 
     const confData = parseSheetRow(confRow);
@@ -503,9 +508,9 @@ router.get('/invoice/:order_number', requireAuth, async (req, res) => {
     const sheets = await getSheets();
     const invRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: 'Invoices!A:BA', // see comment on the Order Confirmations read above
+      range: 'Invoices!A:BF', // see comment on the Order Confirmations read above
     });
-    const invRow = (invRes.data.values || []).find(r => r[0] && normalizeOrderNumber(r[0]) === normalizeOrderNumber(req.params.order_number));
+    const invRow = (invRes.data.values || []).find(r => r[5] && normalizeOrderNumber(r[5]) === normalizeOrderNumber(req.params.order_number));
     if (!invRow) return res.status(404).json({ error: 'Invoice not available yet. Your order confirmation is still being reviewed.' });
 
     const invoiceData = parseSheetRow(invRow);
