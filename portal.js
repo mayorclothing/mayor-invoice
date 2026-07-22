@@ -280,38 +280,32 @@ function parseSheetRow(row) {
   };
 }
 
-// Get invoice data — checks Invoices first, then Order Confirmations
+// Get invoice data — checks Invoices first, then Order Confirmations. Always
+// reads both tabs (rather than short-circuiting once one row is found) because
+// print_background in particular is often only filled in on whichever tab the
+// order started on and never copied to the other — an order invoiced after
+// Matt/Marcus pasted its swatch into Order Confirmations would otherwise lose
+// that background entirely once its (blank-print_background) Invoices row wins.
 async function getOrderDetailData(order_number) {
   const sheets = await getSheets();
-
-  // Try Invoices sheet first
-  const invRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: SHEET_ID,
-    range: 'Invoices!A:BF',
-  });
-  const invRows = invRes.data.values || [];
   const target = normalizeOrderNumber(order_number);
-  const invRow = invRows.find(r => r[5] && normalizeOrderNumber(r[5]) === target);
-  if (invRow) {
-    const detail = parseSheetRow(invRow);
-    detail.print_background = detail.print_background || swatchUrlFor(detail.order_number);
-    return { ...detail, source: 'invoice' };
-  }
 
-  // Fall back to Order Confirmations
-  const confRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: SHEET_ID,
-    range: 'Order Confirmations!A:BF',
-  });
-  const confRows = confRes.data.values || [];
-  const confRow = confRows.find(r => r[5] && normalizeOrderNumber(r[5]) === target);
-  if (confRow) {
-    const detail = parseSheetRow(confRow);
-    detail.print_background = detail.print_background || swatchUrlFor(detail.order_number);
-    return { ...detail, source: 'confirmation' };
-  }
+  const [invRes, confRes] = await Promise.all([
+    sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Invoices!A:BF' }),
+    sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Confirmations!A:BF' }),
+  ]);
+  const invRow = (invRes.data.values || []).find(r => r[5] && normalizeOrderNumber(r[5]) === target);
+  const confRow = (confRes.data.values || []).find(r => r[5] && normalizeOrderNumber(r[5]) === target);
 
-  return null;
+  const primaryRow = invRow || confRow;
+  if (!primaryRow) return null;
+
+  const detail = parseSheetRow(primaryRow);
+  const otherRow = primaryRow === invRow ? confRow : invRow;
+  detail.print_background = detail.print_background
+    || (otherRow ? parseSheetRow(otherRow).print_background : '')
+    || swatchUrlFor(detail.order_number);
+  return { ...detail, source: invRow ? 'invoice' : 'confirmation' };
 }
 
 // ── EMAIL ──
