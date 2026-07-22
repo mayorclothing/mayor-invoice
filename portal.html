@@ -818,10 +818,15 @@ async function showOrder(idx) {
         ? `<span style="text-decoration:line-through; color:#aaa; display:block; font-size:12px;">${fmtMoney(item.orig_price)}</span><span>${fmtMoney(item.price)}</span>`
         : fmtMoney(item.price);
 
-      const imgUrl = safeUrl(item.url);
+      // Some historical rows have a product PAGE link (not an image file) pasted into
+      // this column -- rendering that as <img src> just shows a broken-icon. Only try
+      // it as an image when the path actually looks like one.
+      const rawItemUrl = safeUrl(item.url);
+      const imgUrl = rawItemUrl && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(rawItemUrl) ? rawItemUrl : '';
+      const imgLinkUrl = imgUrl || rawItemUrl;
       const imgHTML = imgUrl
-        ? `<a href="${esc(imgUrl)}" target="_blank" rel="noopener noreferrer"><img src="${esc(imgUrl)}" alt="Product" style="width:72px; height:72px; object-fit:contain; border-radius:6px; display:block; margin-bottom:6px;" /></a>`
-        : '';
+        ? `<a href="${esc(imgLinkUrl)}" target="_blank" rel="noopener noreferrer"><img src="${esc(imgUrl)}" alt="Product" style="width:72px; height:72px; object-fit:contain; border-radius:6px; display:block; margin-bottom:6px;" /></a>`
+        : (rawItemUrl ? `<a href="${esc(rawItemUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:12px; color:#1a1a18;">View</a>` : '');
       const productLink = safeUrl(d.product_page);
       const productLinkHTML = productLink
         ? `<div style="font-size:12px; margin-top:2px;"><a href="${esc(productLink)}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Additional Details</a></div>`
