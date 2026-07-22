@@ -202,8 +202,10 @@ async function renderInvoicePdf(data, logoPath = DEFAULT_LOGO_PATH) {
 
       // Line items
       line_items.forEach((item, i) => {
-        // Normalize description - replace \n with actual newlines, keep spaces intact
-        const descText = (item.description || '').replace(/\\n/g, '\n').replace(/ \/ /g, '\n');
+        // Normalize description - replace \n with actual newlines, keep spaces intact.
+        // sizes are stored in their own column now; re-append them here so the rendered
+        // cell is byte-identical to the old merged description (sizes last, \n-joined).
+        const descText = [((item.description || '').replace(/\\n/g, '\n').replace(/ \/ /g, '\n')), item.sizes].filter(Boolean).join('\n');
         const imgBuf = imageBuffers[i] || null;
         const imgSize = 52; // thumbnail size in points
         const descH = doc.fontSize(8.5).heightOfString(descText, { width: dW - 8, lineGap: 1.5 });
