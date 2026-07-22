@@ -393,7 +393,13 @@ function showPage(name) {
   document.getElementById('page-' + name).classList.add('active');
   document.body.classList.toggle('auth-fullbleed', name === 'login' || name === 'create-account' || name === 'forgot');
   document.body.classList.toggle('detail-bg', name === 'detail');
-  if (name !== 'detail') { document.body.style.backgroundImage = ''; document.body.style.backgroundSize = ''; document.body.style.backgroundColor = ''; }
+  if (name !== 'detail') {
+    document.body.style.backgroundImage = '';
+    document.body.style.backgroundSize = '';
+    document.body.style.backgroundColor = '';
+    document.body.style.backgroundRepeat = '';
+    document.body.style.backgroundPosition = '';
+  }
 }
 
 function showForgot() { showPage('forgot'); }
