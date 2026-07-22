@@ -14,7 +14,7 @@ const { google } = require('googleapis');
 
 const SHEET_ID = '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
 const CONFIRM = process.argv.includes('--confirm');
-const TEST_ROW_NAMES = new Set(['TEST Order 1', 'TEST Order 2', 'TEST Order 3', 'Linville Test']);
+const TEST_ROW_NAMES = new Set(['test order 1', 'test order 2', 'test order 3', 'linville test']);
 const OKC_NAME = 'Oklahoma City Golf & Country Club I';
 
 function normalize(v) { return String(v || '').trim().replace(/\s+/g, ' '); }
@@ -74,7 +74,7 @@ async function findTestRows(sheets, tabTitle, range) {
   const matches = [];
   rows.forEach((r, i) => {
     if (i === 0) return;
-    if (TEST_ROW_NAMES.has(normalize(r[0]))) matches.push({ rowNum: i + 1, order_number_raw: r[0] });
+    if (TEST_ROW_NAMES.has(normalize(r[0]).toLowerCase())) matches.push({ rowNum: i + 1, order_number_raw: r[0] });
   });
   return matches;
 }
