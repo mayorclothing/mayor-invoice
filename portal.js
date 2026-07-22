@@ -526,7 +526,7 @@ router.get('/invoice/:order_number', requireAuth, async (req, res) => {
   try {
     if (!req.user.admin) {
       const orders = await getOrdersFromSheet(req.user.email);
-      if (!orders.find(o => o.order_number === req.params.order_number)) return res.status(403).json({ error: 'Not authorized' });
+      if (!orders.find(o => o.order_number === normalizeOrderNumber(req.params.order_number))) return res.status(403).json({ error: 'Not authorized' });
     }
 
     // Only generate PDF from Invoices sheet (not confirmations)
