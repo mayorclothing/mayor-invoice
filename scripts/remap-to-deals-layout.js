@@ -19,6 +19,7 @@ const argSheet = (process.argv.find((a) => a.startsWith('--sheet=')) || '').spli
 const NEW_SHEET_ID = process.env.NEW_SHEET_ID || argSheet || '';
 const CONFIRM = process.argv.includes('--confirm');
 const SELF_TEST = process.argv.includes('--self-test');
+const FORCE_LIVE = process.argv.includes('--force-live'); // deliberate override for the actual cutover write
 
 function normalizeOrderNumber(v) { return String(v || '').trim().replace(/\s+/g, ' '); }
 
@@ -112,7 +113,7 @@ async function processOrderTab(sheets, title, dealsLookup) {
 async function main() {
   if (SELF_TEST) return selfTest();
   if (!NEW_SHEET_ID) throw new Error('NEW_SHEET_ID not set — pass the COPY spreadsheet id via NEW_SHEET_ID env or --sheet=<id>.');
-  if (NEW_SHEET_ID === LIVE_SHEET_ID) throw new Error('Refusing to run against the LIVE sheet. Make a copy first and target the copy.');
+  if (NEW_SHEET_ID === LIVE_SHEET_ID && !FORCE_LIVE) throw new Error('Refusing to run against the LIVE sheet. Make a copy first and target the copy, or pass --force-live once you mean it.');
   const sheets = await getSheets();
   console.log(CONFIRM ? '=== LIVE RUN (writes the COPY) ===' : '=== DRY RUN (pass --confirm to write) ===');
   console.log('Target (must be the COPY):', NEW_SHEET_ID);
