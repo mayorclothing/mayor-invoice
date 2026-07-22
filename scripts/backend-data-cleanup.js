@@ -6,6 +6,12 @@
 //
 // Dry-run by default (prints what it would delete). Pass --confirm to actually delete.
 //
+// ⚠️ OLD-LAYOUT, PRE-CUTOVER ONLY (sheet-reorg). This reads fixed old-layout column
+// indices (r[22]=subtotal, r[25]=total, r[8/13/18]=qty1-3) and A:AV ranges. It already
+// ran once for the 2026-07 audit; if ever re-run, only against the OLD sheet. Kept
+// hardcoded to the old SHEET_ID (not MO_SHEET_ID) on purpose — do NOT env-var it, or a
+// blanket MO_SHEET_ID switch would point it at the new sheet and it would read garbage.
+//
 // Usage:
 //   GOOGLE_SERVICE_ACCOUNT='<json>' node scripts/backend-data-cleanup.js
 //   GOOGLE_SERVICE_ACCOUNT='<json>' node scripts/backend-data-cleanup.js --confirm

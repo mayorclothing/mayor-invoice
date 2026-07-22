@@ -3,6 +3,13 @@
 // order from ever appearing for a customer login), and 4 orders with placeholder
 // ship-date text instead of a real date.
 //
+// ⚠️ PRE-CUTOVER ONLY (sheet-reorg). This writes Order Info by the OLD column letters
+// (B=email, D=ship_date). Run it BEFORE build-new-sheet.js and against the OLD sheet;
+// build-new-sheet.js then carries these filled values into the new HubSpot-mirrored
+// sheet. After cutover those letters are wrong (new: B=club, C=ship_date, D=email) —
+// do NOT run this against the new sheet without updating the columns first. Kept
+// hardcoded to the old SHEET_ID (not MO_SHEET_ID) so it can't accidentally hit the new one.
+//
 // Fill in the two maps below with real values, then run:
 //   GOOGLE_SERVICE_ACCOUNT='<json>' node scripts/fill-missing-fields.js            (dry run)
 //   GOOGLE_SERVICE_ACCOUNT='<json>' node scripts/fill-missing-fields.js --confirm  (writes)
