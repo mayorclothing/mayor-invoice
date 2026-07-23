@@ -55,6 +55,11 @@
   /* LAYOUT */
   .page { display: none; }
   .page.active { display: block; }
+  /* Hides every page (including the login form that's "active" by default in
+     the static HTML) until restoreSession() below has decided, on load,
+     whether the mayor_token cookie is still valid -- otherwise the login
+     screen visibly flashes for a moment before swapping to the orders page. */
+  body.session-check .page { display: none !important; }
   .container { max-width: 680px; margin: 0 auto; padding: 2.5rem 1rem; }
   .container-wide { max-width: 900px; margin: 0 auto; padding: 2.5rem 1rem; }
   /* These sit directly on the page background -- fixed black/white pattern is
@@ -190,7 +195,7 @@
   .auth-bottom a { color: var(--foreground); text-decoration: underline; }
 </style>
 </head>
-<body class="auth-fullbleed">
+<body class="auth-fullbleed session-check">
 
 <nav>
   <div class="nav-logo"><img src="/mayor-logo.png" alt="Mayor" style="height:36px;" /></div>
@@ -660,10 +665,21 @@ async function showOrder(idx) {
   // swatches/ file convention only if the sheet cell is blank). Falls back to
   // the default black pattern (detail-bg class) when neither exists -- clear
   // any previous order's background first so it doesn't linger while this one
-  // loads or if this order has none. The actual image isn't known until the
-  // order-detail fetch below resolves, so this only clears state here.
+  // loads or if this order has none.
   document.body.style.backgroundImage = '';
   document.querySelectorAll('#page-detail .page-heading, #page-detail .fine-print').forEach(el => el.classList.remove('on-light'));
+
+  // Optimistic paint: try the same-origin /swatches/ route immediately, using
+  // only the order number we already have -- no need to wait on the
+  // order-detail fetch (2 Google Sheets API reads) below. This is the actual
+  // background for any order using the local-file fallback (the common case
+  // per Matt/Marcus), so it's usually already correct; the fetch below may
+  // still overwrite it with a sheet-provided Shopify CDN URL once known. A
+  // missing swatch just 404s silently -- no visible effect.
+  document.body.style.backgroundImage = `url('/swatches/${encodeURIComponent(o.order_number)}')`;
+  document.body.style.backgroundSize = 'cover';
+  document.body.style.backgroundRepeat = 'no-repeat';
+  document.body.style.backgroundPosition = 'center';
 
   const badge = document.getElementById('detail-status-badge');
   badge.textContent = displayStatus(o.status);
@@ -993,9 +1009,11 @@ window.addEventListener('load', () => {
   const params = new URLSearchParams(window.location.search);
   if (params.get('token') && params.get('action') === 'set-password') {
     showPage('setpassword');
+    document.body.classList.remove('session-check');
   } else if (params.get('token') && params.get('action') === 'reset-password') {
     showPage('setpassword');
     document.querySelector('#page-setpassword h1').textContent = 'Reset your password';
+    document.body.classList.remove('session-check');
   } else {
     restoreSession();
   }
@@ -1003,7 +1021,9 @@ window.addEventListener('load', () => {
 
 // A plain page refresh (F5) wipes currentUser from JS memory even though the
 // mayor_token cookie is still valid for days — without this, every refresh
-// looked like a logout even though the session itself was fine.
+// looked like a logout even though the session itself was fine. The page
+// stays hidden (body.session-check, see CSS) until this resolves either way,
+// so there's no flash of the login screen before swapping to orders.
 async function restoreSession() {
   try {
     const res = await fetch('/portal/me', { credentials: 'include' });
@@ -1013,7 +1033,10 @@ async function restoreSession() {
     document.getElementById('nav-email').textContent = data.email;
     document.getElementById('nav-logout').style.display = '';
     loadOrders();
-  } catch(e) {}
+  } catch(e) {
+  } finally {
+    document.body.classList.remove('session-check');
+  }
 }
 </script>
 </body>
