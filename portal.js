@@ -375,6 +375,11 @@ router.post('/login', rateLimit(10, 60000), async (req, res) => {
   }
 });
 
+// Lets the page restore a session after a plain refresh instead of bouncing to login.
+router.get('/me', requireAuth, (req, res) => {
+  res.json({ email: req.user.email, club: req.user.club, admin: !!req.user.admin });
+});
+
 router.post('/logout', (req, res) => {
   res.clearCookie('mayor_token');
   res.json({ ok: true });

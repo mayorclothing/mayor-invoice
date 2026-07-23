@@ -727,30 +727,35 @@ async function showOrder(idx) {
     // https URL -- safeUrl() alone would reject that.
     const bgUrl = /^\//.test(d.print_background || '') ? d.print_background : safeUrl(d.print_background);
     if (bgUrl && currentOrder === o) {
+      // Paint the background the moment the URL is known -- the browser starts
+      // fetching/painting it right away via CSS. Previously this was set inside
+      // swatchProbe.onload below, so the customer waited for a *second*,
+      // fully-decoded copy of the image (loaded via a JS Image() object, for
+      // canvas sampling) before seeing anything at all.
+      // These prints aren't authored as seamless tiles -- CSS repeat at any
+      // size slices through glyphs at each tile boundary, leaving stray
+      // fragments (e.g. a disconnected top-of-the-"2") wherever tiles meet.
+      // No repeat means no boundary for that to happen at, at the cost of
+      // only showing one (already print-dense) instance instead of a
+      // repeated field of them.
+      document.body.style.backgroundImage = `url('${bgUrl}')`;
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundRepeat = 'no-repeat';
+      document.body.style.backgroundPosition = 'center';
+
+      // Sample the swatch's average color -- used two ways: (1) light/dark
+      // heading-chip variant, since most prints are white and a fixed dark
+      // chip looked like a mismatched box, and (2) as the page's
+      // background-color fallback, so shrinking the image below "cover"
+      // (to "zoom out" -- show more of the print's own internal repeat
+      // instead of cropping in tight) exposes matching color at the edges
+      // instead of a jarring black gap. This runs after the background is
+      // already visible, so it only ever refines the chip/edge color, never
+      // blocks the initial paint.
       const swatchProbe = new Image();
-      swatchProbe.crossOrigin = 'anonymous'; // needed for canvas sampling below on cross-origin (Shopify CDN) URLs
+      swatchProbe.crossOrigin = 'anonymous'; // needed for canvas sampling on cross-origin (Shopify CDN) URLs
       swatchProbe.onload = () => {
         if (currentOrder !== o) return; // navigated away while this was loading
-        // These prints aren't authored as seamless tiles -- CSS repeat at any
-        // size slices through glyphs at each tile boundary, leaving stray
-        // fragments (e.g. a disconnected top-of-the-"2") wherever tiles meet.
-        // No repeat means no boundary for that to happen at, at the cost of
-        // only showing one (already print-dense) instance instead of a
-        // repeated field of them.
-        document.body.style.backgroundImage = `url('${bgUrl}')`;
-        document.body.style.backgroundSize = 'cover';
-        document.body.style.backgroundRepeat = 'no-repeat';
-        document.body.style.backgroundPosition = 'center';
-
-        // Sample the swatch's average color -- used two ways: (1) light/dark
-        // heading-chip variant, since most prints are white and a fixed dark
-        // chip looked like a mismatched box, and (2) as the page's
-        // background-color fallback, so shrinking the image below "cover"
-        // (to "zoom out" -- show more of the print's own internal repeat
-        // instead of cropping in tight) exposes matching color at the edges
-        // instead of a jarring black gap. Wrapped separately from the image
-        // itself: a CORS-blocked canvas read shouldn't take the background
-        // down with it, just skip the color-matched chip styling.
         try {
           const c = document.createElement('canvas');
           c.width = 20; c.height = 20;
@@ -991,8 +996,25 @@ window.addEventListener('load', () => {
   } else if (params.get('token') && params.get('action') === 'reset-password') {
     showPage('setpassword');
     document.querySelector('#page-setpassword h1').textContent = 'Reset your password';
+  } else {
+    restoreSession();
   }
 });
+
+// A plain page refresh (F5) wipes currentUser from JS memory even though the
+// mayor_token cookie is still valid for days — without this, every refresh
+// looked like a logout even though the session itself was fine.
+async function restoreSession() {
+  try {
+    const res = await fetch('/portal/me', { credentials: 'include' });
+    if (!res.ok) return; // no/expired cookie -- stay on the login page
+    const data = await res.json();
+    currentUser = { email: data.email, club: data.club, admin: !!data.admin };
+    document.getElementById('nav-email').textContent = data.email;
+    document.getElementById('nav-logout').style.display = '';
+    loadOrders();
+  } catch(e) {}
+}
 </script>
 </body>
 </html>
