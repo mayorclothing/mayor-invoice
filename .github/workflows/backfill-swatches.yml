@@ -1,0 +1,41 @@
+name: Backfill order print swatches
+
+# Keeps swatches/ in sync with the sheet's Print Background column so every
+# order gets the instant same-origin background paint (see HANDOFF.md /
+# scripts/backfill-swatches.js) without anyone having to remember to run the
+# script by hand after a new order goes out.
+on:
+  schedule:
+    - cron: '17 13 * * *' # ~daily, off-the-hour to avoid GitHub's cron thundering-herd delay
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download any new swatches
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          MO_SHEET_ID: ${{ secrets.MO_SHEET_ID }}
+        run: node scripts/backfill-swatches.js --confirm
+
+      - name: Commit and push if anything changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add swatches/
+          if git diff --cached --quiet; then
+            echo "No new swatches — nothing to commit."
+          else
+            git commit -m "Auto-backfill order print swatches"
+            git push
+          fi
