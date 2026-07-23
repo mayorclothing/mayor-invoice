@@ -74,19 +74,6 @@ function trustedPaymentLink(u) {
   } catch (e) { return ''; }
 }
 function httpsUrlOrEmpty(u) { try { const url = new URL(String(u)); return url.protocol === 'https:' ? url.toString() : ''; } catch (e) { return ''; } }
-// /generate renders a PDF (public — the portal and browser generator both call it)
-// but must NOT let an anonymous caller WRITE to the sheet. Gate the logging path
-// behind INTERNAL_API_KEY (timing-safe). Fail closed: no key configured => no
-// anonymous writes. The portal never trips this (it sends skip_logging).
-const crypto = require('crypto');
-function writeAuthorized(req) {
-  const expected = process.env.INTERNAL_API_KEY || '';
-  if (!expected) return false;
-  const hdr = req.header('Authorization') || '';
-  const tok = hdr.startsWith('Bearer ') ? hdr.slice(7) : '';
-  const a = Buffer.from(tok), b = Buffer.from(expected);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
 function sanitizeGeneratePayload(data) {
   const d = { ...(data || {}) };
   d.payment_link = trustedPaymentLink(d.payment_link);
@@ -244,13 +231,13 @@ app.post('/generate', async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="mayor-invoice.pdf"');
     res.send(pdf);
 
-    // Log order to Google Sheet (non-blocking) — only for authenticated callers.
-    // The portal sends skip_logging (render-only); the browser generator must
-    // present INTERNAL_API_KEY. Anonymous writes are dropped (F4).
-    if (!data.skip_logging) {
-      if (writeAuthorized(req)) appendOrderToSheet(data);
-      else console.warn('Blocked unauthenticated /generate sheet write for order:', data.order_number);
-    }
+    // Log order to Google Sheet (non-blocking) — setup email sent manually.
+    // Intentionally open: the GitHub-Pages invoice generator (unlisted; used only
+    // by Matt/Marcus) writes through here with no key, and it must keep working as
+    // a fallback. Residual risk (anyone who learns the endpoint + an order number
+    // could overwrite that order's non-payment fields) is accepted; payment links
+    // are still host-validated in sanitizeGeneratePayload.
+    if (!data.skip_logging) appendOrderToSheet(data);
 
   } catch(e) {
     console.error(e);
