@@ -669,11 +669,18 @@ async function showOrder(idx) {
   document.body.style.backgroundImage = '';
   document.querySelectorAll('#page-detail .page-heading, #page-detail .fine-print').forEach(el => el.classList.remove('on-light'));
 
+  // Kick off the order-detail fetch (the actual line items/totals) FIRST, with
+  // an explicit high-priority hint, before touching the background at all --
+  // this determines request-scheduling order/priority for the two, so the
+  // data fetch is never starved by the background-image request below.
+  const detailPromise = fetch('/portal/order-detail/' + encodeURIComponent(o.order_number),
+    { credentials: 'include', priority: 'high' });
+
   // Optimistic paint: try the same-origin /swatches/ route immediately, using
   // only the order number we already have -- no need to wait on the
-  // order-detail fetch (2 Google Sheets API reads) below. This is the actual
+  // order-detail fetch (2 Google Sheets API reads) above. This is the actual
   // background for any order using the local-file fallback (the common case
-  // per Matt/Marcus), so it's usually already correct; the fetch below may
+  // per Matt/Marcus), so it's usually already correct; the fetch above may
   // still overwrite it with a sheet-provided Shopify CDN URL once known. A
   // missing swatch just 404s silently -- no visible effect.
   document.body.style.backgroundImage = `url('/swatches/${encodeURIComponent(o.order_number)}')`;
@@ -729,7 +736,7 @@ async function showOrder(idx) {
   document.getElementById('detail-download-card').style.display = 'none';
   document.getElementById('detail-terms-card').style.display = 'none';
   try {
-    const res = await fetch('/portal/order-detail/' + encodeURIComponent(o.order_number), { credentials: 'include' });
+    const res = await detailPromise;
     if (!res.ok) throw new Error('Details not available');
     const d = await res.json();
 
