@@ -51,7 +51,9 @@ app.get('/orders', (req, res) => {
   res.sendFile(path.join(__dirname, 'portal.html'));
 });
 
-const SHEET_ID = process.env.MO_SHEET_ID || '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
+// No fallback (the old id is the dead pre-reorg sheet). portal.js — required
+// above — already hard-fails on a missing MO_SHEET_ID before we get here.
+const SHEET_ID = process.env.MO_SHEET_ID;
 const SHEET_CREDS = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT || '{}');
 const LOGO_PATH = __dirname + '/Mayor_Logo_transparent.png';
 

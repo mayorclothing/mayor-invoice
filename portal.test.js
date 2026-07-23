@@ -2,6 +2,7 @@
 // Needs JWT_SECRET set — portal.js refuses to load without it (see line ~60).
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-not-for-prod';
 process.env.GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT || '{}';
+process.env.MO_SHEET_ID = process.env.MO_SHEET_ID || 'test-sheet-id';
 
 const assert = require('assert');
 const { swatchUrlFor } = require('./portal');

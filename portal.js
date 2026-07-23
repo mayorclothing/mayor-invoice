@@ -53,7 +53,12 @@ function rateLimit(max, windowMs) {
   };
 }
 
-const SHEET_ID = process.env.MO_SHEET_ID || '152hyxQz87IwPYl2lgBCm6pKKSjYl1hoL-AuZu-wODbo';
+// No fallback: '152hyxQz…' is the DEAD pre-reorg sheet. Refuse to start rather
+// than silently serve/write the wrong sheet (same fail-loud stance as JWT_SECRET).
+const SHEET_ID = process.env.MO_SHEET_ID;
+if (!SHEET_ID) {
+  throw new Error('MO_SHEET_ID is not set. Refusing to start against the dead fallback sheet — set MO_SHEET_ID in the environment.');
+}
 // JWT_SECRET must be set in the environment. The fallback exists only for local dev;
 // if it is ever used while NODE_ENV=production, log a loud warning so it gets caught.
 const JWT_SECRET = process.env.JWT_SECRET;
