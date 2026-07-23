@@ -567,7 +567,20 @@ async function loadOrders() {
   }
 }
 
+// True when a description has more than one line carrying its own size
+// breakdown (e.g. one line per color: "Crimson - M: 1, L: 1..." / "Navy - M: 1...").
+// parseSizes/stripSizes below assume a single size list for the whole item --
+// on multi-color text they instead extract one size's LAST-seen count (silently
+// dropping every other color's numbers) and leave dangling ",," fragments where
+// tokens were stripped mid-line. Safer to leave that text untouched and let the
+// customer read the sheet's own wording than to render a wrong, garbled summary.
+function hasMultipleSizeGroups(desc) {
+  const sizeLine = /(XS|3XL|XXL|XL|S|M|L):\s*\d+/;
+  return (desc || '').split('\n').filter(line => sizeLine.test(line)).length > 1;
+}
+
 function parseSizes(desc) {
+  if (hasMultipleSizeGroups(desc)) return [];
   const order = ['XS','S','M','L','XL','XXL','3XL'];
   const found = {};
   // Match size labels only when preceded by start, space, comma, or dash — not mid-word
@@ -580,6 +593,7 @@ function parseSizes(desc) {
 }
 
 function stripSizes(desc) {
+  if (hasMultipleSizeGroups(desc)) return desc; // show the sheet's own multi-color/size text as-is
   // Remove size tokens like "S: 2" only when preceded by start, space, comma, or dash
   return desc
     .replace(/(?:^|[\s,\-–\/])(XS|3XL|XXL|XL|S|M|L):\s*\d+/g, '')
