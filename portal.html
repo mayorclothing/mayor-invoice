@@ -922,8 +922,19 @@ async function showOrder(idx) {
 
     const totalQty = (d.line_items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
 
+    // Subtotal uses the same 4-col grid as the line items above (not the plain
+    // key/value totRow rows below it) so its quantity lands directly under the
+    // Quantity column header -- that alignment, not any label text, is what
+    // marks it as the subtotal quantity.
+    const subtotalRow = `<div style="display:grid; grid-template-columns:80px 2fr 1fr 1fr; gap:0 10px; padding:7px 0; border-bottom:1px solid var(--border); font-size:13px; align-items:center;">
+      <div></div>
+      <span class="detail-key">Subtotal</span>
+      <span style="text-align:center; font-weight:500;">${totalQty}</span>
+      <span class="detail-val">${fmtMoney(effectiveSubtotal)}</span>
+    </div>`;
+
     html += `<div style="margin-top:12px;">
-      ${totRow(`Subtotal (${totalQty})`, fmtMoney(effectiveSubtotal))}
+      ${subtotalRow}
       ${totRow('Embroidery', embHTML)}
       ${totRow('Art Setup', artHTML)}
       ${customLabelRow}
