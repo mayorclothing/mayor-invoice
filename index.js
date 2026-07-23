@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { google } = require('googleapis');
 const { renderInvoicePdf } = require('./doc-render');
+const { buildRow, INFO_DEAL_COL, matchRowIndex, firstEmptyRow } = require('./mo-sheet');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
@@ -124,57 +125,43 @@ async function appendOrderToSheet(data) {
     const items = data.line_items || [];
     const get = (i, key) => items[i] ? (items[i][key] || '') : '';
     const subtotalQty = data.subtotal_quantity != null ? data.subtotal_quantity : items.reduce((s, li) => s + (Number(li.quantity) || 0), 0);
-    // Deals-tab-mirrored layout (A..BF, 58 cols) — Order Number lives at F=5, not
-    // A (Deal ID takes A here; this writer has none, so it's left blank). Must
-    // match, exactly: portal.js parseSheetRow (read) and mayor-email-backend
-    // googleStore.js buildDetailRow (the other writer).
-    const rowData = [
-      data.deal_id || '', data.deal_name || '', data.deal_stage || '', data.tracking_number || '',
-      data.customer_email || '', data.order_number || '', data.product_page || '',
-      data.print_background || '',
-      data.club || '', data.shipping_address || '', data.address || '',
-      data.ship_date || '', data.in_hand_date || '', data.payment_terms || '',
-      get(0,'url'), get(0,'description'), get(0,'sizes'), get(0,'quantity'), get(0,'price'),
-      get(1,'url'), get(1,'description'), get(1,'sizes'), get(1,'quantity'), get(1,'price'),
-      get(2,'url'), get(2,'description'), get(2,'sizes'), get(2,'quantity'), get(2,'price'),
-      get(3,'url'), get(3,'description'), get(3,'sizes'),
-      get(4,'url'), get(4,'description'), get(4,'sizes'),
-      get(3,'quantity'), get(3,'price'), get(4,'quantity'), get(4,'price'),
-      subtotalQty || '', data.subtotal || '',
-      data.embroidery || '',
-      (data.art_setup != null ? parseFloat(String(data.art_setup).replace(/[$,\s]/g,'')) || '' : ''),
-      data.sample_reimbursement || '', data.custom_label || '', data.shipping || '', data.total || '',
-      data.payment_link || '', data.payment_link_2 || '',
-      data.strike_embroidery ? '1' : '', data.strike_art ? '1' : '', data.strike_shipping ? '1' : '',
-      get(0,'orig_price') || '', get(1,'orig_price') || '', get(2,'orig_price') || '', get(3,'orig_price') || '', get(4,'orig_price') || '',
-      '', // BF=57 drive_pdf_link — set by the backend's Drive upload; blank when written here
-    ];
+    const dealId = data.deal_id || '';
+    // Column order lives in mo-sheet.js (shared with portal.js reader + the
+    // backend writer) — reference cells by name, never by position (F7).
+    const rowData = buildRow({
+      deal_id: data.deal_id || '', deal_name: data.deal_name || '', deal_stage: data.deal_stage || '', tracking_number: data.tracking_number || '',
+      customer_email: data.customer_email || '', order_number: data.order_number || '', product_page: data.product_page || '',
+      print_background: data.print_background || '',
+      club: data.club || '', shipping_address: data.shipping_address || '', address: data.address || '',
+      ship_date: data.ship_date || '', in_hand_date: data.in_hand_date || '', payment_terms: data.payment_terms || '',
+      p1_url: get(0,'url'), p1_desc: get(0,'description'), p1_sizes: get(0,'sizes'), p1_qty: get(0,'quantity'), p1_price: get(0,'price'),
+      p2_url: get(1,'url'), p2_desc: get(1,'description'), p2_sizes: get(1,'sizes'), p2_qty: get(1,'quantity'), p2_price: get(1,'price'),
+      p3_url: get(2,'url'), p3_desc: get(2,'description'), p3_sizes: get(2,'sizes'), p3_qty: get(2,'quantity'), p3_price: get(2,'price'),
+      p4_url: get(3,'url'), p4_desc: get(3,'description'), p4_sizes: get(3,'sizes'),
+      p5_url: get(4,'url'), p5_desc: get(4,'description'), p5_sizes: get(4,'sizes'),
+      p4_qty: get(3,'quantity'), p4_price: get(3,'price'), p5_qty: get(4,'quantity'), p5_price: get(4,'price'),
+      subtotal_quantity: subtotalQty || '', subtotal: data.subtotal || '',
+      embroidery: data.embroidery || '',
+      art_setup: (data.art_setup != null ? parseFloat(String(data.art_setup).replace(/[$,\s]/g,'')) || '' : ''),
+      sample_reimbursement: data.sample_reimbursement || '', custom_label: data.custom_label || '', shipping: data.shipping || '', total: data.total || '',
+      payment_link: data.payment_link || '', payment_link_2: data.payment_link_2 || '',
+      strike_embroidery: data.strike_embroidery ? '1' : '', strike_art: data.strike_art ? '1' : '', strike_shipping: data.strike_shipping ? '1' : '',
+      orig_price_1: get(0,'orig_price'), orig_price_2: get(1,'orig_price'), orig_price_3: get(2,'orig_price'), orig_price_4: get(3,'orig_price'), orig_price_5: get(4,'orig_price'),
+      drive_pdf_link: '', // set by the backend's Drive upload; blank when written here
+    });
 
-    // Helper: find next empty row in column A (after header), then write rowData there
+    // Upsert keyed on the stable deal_id (fallback order_number), so a renamed
+    // order updates its row instead of orphaning it (F10). deal_id col: A on
+    // OC/Invoices, H on Order Info; order_number col: F on OC/Invoices, A on Order Info.
     async function writeToSheet(tabName, orderNumber, rowData) {
-      // Order Info keys on column A; Order Confirmations/Invoices key on F
-      // (Order Number, per the Deals-mirrored layout — Deal ID takes column A there).
-      const keyCol = tabName === 'Order Info' ? 'A' : 'F';
-      const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tabName}!${keyCol}:${keyCol}` });
-      const col = res.data.values || [];
-      // Check if order already exists (skip row 0 which is header)
-      const existingIdx = col.findIndex((r, i) => i > 0 && normalizeOrderNumber(r[0]) === normalizeOrderNumber(orderNumber));
-      let targetRow;
-      if (existingIdx > 0) {
-        targetRow = existingIdx + 1; // 1-based
-        console.log(`${tabName} updating row ${targetRow} for:`, orderNumber);
-      } else {
-        // Find first row where column A is empty (after header row 1)
-        let firstEmpty = col.length + 1; // default: one past last row
-        for (let i = 1; i < col.length; i++) {
-          if (!col[i] || !col[i][0] || col[i][0].trim() === '') {
-            firstEmpty = i + 1; // 1-based
-            break;
-          }
-        }
-        targetRow = firstEmpty;
-        console.log(`${tabName} inserting row ${targetRow} for:`, orderNumber);
-      }
+      const isInfo = tabName === 'Order Info';
+      const dealIdx = isInfo ? INFO_DEAL_COL : 0;
+      const orderIdx = isInfo ? 0 : 5;
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tabName}!A:H` });
+      const rows = res.data.values || [];
+      const idx = matchRowIndex(rows, dealIdx, orderIdx, dealId, normalizeOrderNumber(orderNumber));
+      const targetRow = idx > 0 ? idx + 1 : firstEmptyRow(rows, orderIdx);
+      console.log(`${tabName} ${idx > 0 ? 'updating' : 'inserting'} row ${targetRow} for:`, orderNumber);
       await sheets.spreadsheets.values.update({
         spreadsheetId: SHEET_ID,
         range: `${tabName}!A${targetRow}`,
@@ -185,13 +172,21 @@ async function appendOrderToSheet(data) {
     }
 
     if (isConfirmation) {
-      // Write to Order Info if new order
-      const existingRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:A' });
-      const existingOrders = (existingRows.data.values || []).map(r => normalizeOrderNumber(r[0]));
-      if (!existingOrders.includes(normalizeOrderNumber(data.order_number))) {
+      // Seed the Order Info row if this order isn't there yet (keyed on deal_id
+      // so a rename doesn't seed a duplicate). deal_id goes in col H.
+      const infoRes = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:H' });
+      const infoRows = infoRes.data.values || [];
+      const infoIdx = matchRowIndex(infoRows, INFO_DEAL_COL, 0, dealId, normalizeOrderNumber(data.order_number));
+      if (infoIdx < 1) {
         await writeToSheet('Order Info',  data.order_number,
           [data.order_number || '', data.club || '', data.ship_date || '',
-           data.customer_email || '', 'Awaiting Approval', '', '', ''].map(sheetSafe));
+           data.customer_email || '', 'Awaiting Approval', '', '', dealId].map(sheetSafe));
+      } else if (normalizeOrderNumber((infoRows[infoIdx] || [])[0]) !== normalizeOrderNumber(data.order_number)) {
+        // Rename: update order_number (A) in place on the deal_id-matched row.
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID, range: `Order Info!A${infoIdx + 1}`,
+          valueInputOption: 'USER_ENTERED', resource: { values: [[sheetSafe(data.order_number)]] }
+        });
       }
 
       // Make sure each customer's email is registered in the Users sheet
@@ -207,11 +202,11 @@ async function appendOrderToSheet(data) {
     } else {
       await writeToSheet('Invoices', data.order_number, rowData);
 
-      // Update Order Info status to Awaiting Payment
-      const orderRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:E' });
+      // Update Order Info status to Awaiting Payment (keyed on deal_id; monotonic).
+      const orderRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:H' });
       const orderData = orderRows.data.values || [];
-      const orderIdx = orderData.findIndex((r, i) => i > 0 && normalizeOrderNumber(r[0]) === normalizeOrderNumber(data.order_number));
-      if (orderIdx > 0 && statusRank('Awaiting Payment') > statusRank(orderData[orderIdx][4])) {
+      const orderIdx = matchRowIndex(orderData, INFO_DEAL_COL, 0, dealId, normalizeOrderNumber(data.order_number));
+      if (orderIdx > 0 && statusRank('Awaiting Payment') > statusRank((orderData[orderIdx] || [])[4])) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: SHEET_ID, range: `Order Info!E${orderIdx + 1}`,
           valueInputOption: 'USER_ENTERED', resource: { values: [['Awaiting Payment']] }

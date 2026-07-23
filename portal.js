@@ -6,6 +6,7 @@ const { google } = require('googleapis');
 const path = require('path');
 const fs = require('fs');
 const { trackPackage } = require('./ups');
+const { COL } = require('./mo-sheet');
 const router = express.Router();
 
 // Mirrors index.js's SWATCH_DIR/SWATCH_EXTENSIONS + /swatches/:orderNumber route —
@@ -210,78 +211,67 @@ function parseCurrency(val) {
 
 function parseSheetRow(row) {
   if (!row) return null;
-  // Column mapping (0-indexed) — mirrors the HubSpot "Deals" tab's column order
-  // and names exactly, with print_background inserted after product_page,
-  // payment_link_2 inserted after payment_link, and orig_price x5/drive_pdf_link
-  // appended at the end (fields the Deals tab has no slot for). Order Number
-  // lives at F=5 — Deal ID takes column A here, not order_number.
-  //  0 A deal_id        1 B deal_name       2 C deal_stage    3 D tracking_number
-  //  4 E customer_email 5 F order_number    6 G product_page  7 H print_background
-  //  8 I club           9 J shipping_address 10 K address     11 L ship_date
-  // 12 M in_hand_date  13 N payment_terms
-  // 14–38: product/description/sizes/quantity/price x5, mirroring the Deals tab's
-  // own quirky ordering (slots 4/5 group product/description/sizes together,
-  // then their quantity/price come after slot 5's sizes).
-  // 39 AN subtotal_quantity 40 AO subtotal  41 AP embroidery  42 AQ art_setup
-  // 43 AR sample_reimbursement 44 AS custom_label 45 AT shipping 46 AU total
-  // 47 AV payment_link  48 AW payment_link_2
-  // 49 AX strike_embroidery 50 AY strike_art 51 AZ strike_shipping
-  // 52–56 BA–BE orig_price_1..5  57 BF drive_pdf_link
-  const PRODUCT_IDX = [14, 19, 24, 29, 32];
-  const DESC_IDX    = [15, 20, 25, 30, 33];
-  const SIZES_IDX   = [16, 21, 26, 31, 34];
-  const QTY_IDX      = [17, 22, 27, 35, 37];
-  const PRICE_IDX    = [18, 23, 28, 36, 38];
-  const ORIG_IDX    = [52, 53, 54, 55, 56];
+  // Column positions come from mo-sheet.js COL (shared with both writers) so the
+  // reader can't drift out of lockstep with the layout (F7).
   const items = [];
-  for (let i = 0; i < 5; i++) {
-    const qty   = parseCurrency(row[QTY_IDX[i]]);
-    const price = parseCurrency(row[PRICE_IDX[i]]);
+  const slots = [
+    ['p1_url', 'p1_desc', 'p1_sizes', 'p1_qty', 'p1_price', 'orig_price_1'],
+    ['p2_url', 'p2_desc', 'p2_sizes', 'p2_qty', 'p2_price', 'orig_price_2'],
+    ['p3_url', 'p3_desc', 'p3_sizes', 'p3_qty', 'p3_price', 'orig_price_3'],
+    ['p4_url', 'p4_desc', 'p4_sizes', 'p4_qty', 'p4_price', 'orig_price_4'],
+    ['p5_url', 'p5_desc', 'p5_sizes', 'p5_qty', 'p5_price', 'orig_price_5'],
+  ];
+  for (const [u, d, s, q, p, o] of slots) {
+    const qty   = parseCurrency(row[COL[q]]);
+    const price = parseCurrency(row[COL[p]]);
     if (qty > 0) {
       items.push({
         product:    'Custom Print Polo',
-        url:        row[PRODUCT_IDX[i]] || '',
-        description: row[DESC_IDX[i]] || '',
-        sizes:      row[SIZES_IDX[i]] || '',
+        url:        row[COL[u]] || '',
+        description: row[COL[d]] || '',
+        sizes:      row[COL[s]] || '',
         quantity:   qty,
         price:      price,
-        orig_price: row[ORIG_IDX[i]] ? parseCurrency(row[ORIG_IDX[i]]) : null,
+        orig_price: row[COL[o]] ? parseCurrency(row[COL[o]]) : null,
         amount:     qty * price
       });
     }
   }
 
-  const artRaw = row[42] || null;
+  const artRaw = row[COL.art_setup] || null;
   const artNum = artRaw ? parseCurrency(artRaw) : null;
+  const strikeCell = (name, dflt) => (row[COL[name]] !== undefined && row[COL[name]] !== '' ? row[COL[name]] === '1' : dflt);
 
   return {
-    deal_id:           row[0]  || '',
-    deal_name:         row[1]  || '',
-    deal_stage:        row[2]  || '',
-    tracking_number:   row[3]  || '',
-    order_number:      normalizeOrderNumber(row[5]),
-    product_page:      row[6]  || '',
-    print_background:  row[7]  || '',
-    club:              row[8]  || '',
-    shipping_address:  row[9]  || '',
-    address:           row[10] || '',
-    ship_date:         row[11] || '',
-    in_hand_date:      row[12] || '',
-    payment_terms:     row[13] || '',
-    customer_email:    row[4]  || '',
+    deal_id:           row[COL.deal_id]  || '',
+    deal_name:         row[COL.deal_name]  || '',
+    deal_stage:        row[COL.deal_stage]  || '',
+    tracking_number:   row[COL.tracking_number]  || '',
+    order_number:      normalizeOrderNumber(row[COL.order_number]),
+    product_page:      row[COL.product_page]  || '',
+    print_background:  row[COL.print_background]  || '',
+    club:              row[COL.club]  || '',
+    shipping_address:  row[COL.shipping_address]  || '',
+    address:           row[COL.address] || '',
+    ship_date:         row[COL.ship_date] || '',
+    in_hand_date:      row[COL.in_hand_date] || '',
+    payment_terms:     row[COL.payment_terms] || '',
+    customer_email:    row[COL.customer_email]  || '',
     line_items:        items,
-    subtotal:          parseCurrency(row[40]),
-    embroidery:        parseCurrency(row[41]),
+    subtotal:          parseCurrency(row[COL.subtotal]),
+    embroidery:        parseCurrency(row[COL.embroidery]),
     art_setup:         artNum,
-    sample_reimbursement: row[43] || null,
-    custom_label:      row[44] ? parseCurrency(row[44]) : null,
-    shipping:          parseCurrency(row[45]),
-    total:             parseCurrency(row[46]),
-    payment_link:      row[47] || '',
-    payment_link_2:    row[48] || '',
-    strike_embroidery: row[49] !== undefined && row[49] !== '' ? row[49] === '1' : true,
-    strike_art:        row[50] !== undefined && row[50] !== '' ? row[50] === '1' : true,
-    strike_shipping:   row[51] !== undefined && row[51] !== '' ? row[51] === '1' : false,
+    sample_reimbursement: row[COL.sample_reimbursement] || null,
+    custom_label:      row[COL.custom_label] ? parseCurrency(row[COL.custom_label]) : null,
+    shipping:          parseCurrency(row[COL.shipping]),
+    total:             parseCurrency(row[COL.total]),
+    payment_link:      row[COL.payment_link] || '',
+    payment_link_2:    row[COL.payment_link_2] || '',
+    // Blank strike cell => waived for emb/art, charged for shipping (the standing
+    // default; matches Hermes writing '1' for waived fees).
+    strike_embroidery: strikeCell('strike_embroidery', true),
+    strike_art:        strikeCell('strike_art', true),
+    strike_shipping:   strikeCell('strike_shipping', false),
   };
 }
 
