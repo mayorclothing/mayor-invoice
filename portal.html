@@ -550,7 +550,7 @@ async function loadOrders() {
       <div class="order-row" onclick="showOrder(${i})">
         <div>
           <div class="order-title">${esc(o.order_number)}</div>
-          <div class="order-meta">${esc(o.club)}${currentUser.admin && o.email ? ' · ' + esc(o.email) : ''}${isRealDate(o.ship_date) ? ' · ' + esc(o.ship_date) : ''}</div>
+          <div class="order-meta">${esc(o.club)}</div>
         </div>
         <div class="order-right">
           ${currentUser.admin ? adminFlagBadges(o) : ''}
@@ -651,7 +651,7 @@ async function showOrder(idx) {
   currentOrder = currentOrders[idx];
   const o = currentOrder;
 
-  document.getElementById('detail-order-number').textContent = 'Order: ' + o.order_number;
+  document.getElementById('detail-order-number').textContent = 'Order Number: ' + o.order_number;
   document.getElementById('detail-club').textContent = o.club;
 
   // Per-order print background, when Matt/Marcus has one for this order --
@@ -670,8 +670,6 @@ async function showOrder(idx) {
   badge.className = 'badge ' + statusBadgeClass(o.status);
 
   document.getElementById('detail-info').innerHTML = `
-    <div class="detail-row"><span class="detail-key">Order #</span><span class="detail-val">${esc(o.order_number)}</span></div>
-    <div class="detail-row"><span class="detail-key">Customer</span><span class="detail-val">${esc(o.club)}</span></div>
     <div class="detail-row"><span class="detail-key">Ship Date</span><span class="detail-val">${esc(formatShipDate(o.ship_date))}</span></div>
     <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${esc(displayStatus(o.status))}</span></div>`;
 
@@ -792,7 +790,7 @@ async function showOrder(idx) {
 
     // Payment link (renamed from "Payment"/"Pay Invoice" per request)
     if (safeUrl(d.payment_link)) {
-      infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Payment Link</span><span class="detail-val"><a href="${esc(safeUrl(d.payment_link))}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Pay</a></span></div>`;
+      infoEl.innerHTML += `<div class="detail-row"><span class="detail-key">Payment Link</span><span class="detail-val"><a href="${esc(safeUrl(d.payment_link))}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Click Here</a></span></div>`;
     }
 
     // Single smart download button: invoice if there's a payment link (order has
@@ -894,10 +892,12 @@ async function showOrder(idx) {
       ? Number(d.total)
       : effectiveSubtotal + shipForTotal + customLabelVal + embForTotal + artForTotal - reimbAmt;
 
+    const totalQty = (d.line_items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+
     html += `<div style="margin-top:12px;">
-      ${totRow('Art Fee', artHTML)}
+      ${totRow(`Subtotal (${totalQty})`, fmtMoney(effectiveSubtotal))}
       ${totRow('Embroidery', embHTML)}
-      ${totRow('Subtotal', fmtMoney(effectiveSubtotal))}
+      ${totRow('Art Setup', artHTML)}
       ${customLabelRow}
       ${totRow('Shipping', fmtMoney(d.shipping))}
       ${reimbRow}
