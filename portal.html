@@ -872,7 +872,10 @@ async function showOrder(idx) {
       const imgLinkUrl = imgUrl || rawItemUrl;
       const imgHTML = imgUrl
         ? `<a href="${esc(imgLinkUrl)}" target="_blank" rel="noopener noreferrer"><img src="${esc(imgUrl)}" alt="Product" style="width:72px; height:72px; object-fit:contain; border-radius:6px; display:block; margin-bottom:6px;" /></a>`
-        : (rawItemUrl ? `<a href="${esc(rawItemUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:12px; color:#1a1a18;">View</a>` : '');
+        : (rawItemUrl ? `<a href="${esc(rawItemUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:12px; color:#1a1a18;">View</a>`
+          // No product photo/link at all -- if there's at least a description, name
+          // the item instead of leaving this column blank.
+          : (desc ? `<span style="font-size:12px; color:#666;">Custom Print Polo</span>` : ''));
       const productLink = safeUrl(d.product_page);
       const productLinkHTML = productLink
         ? `<div style="font-size:12px; margin-top:2px;"><a href="${esc(productLink)}" target="_blank" rel="noopener noreferrer" style="color:#1a1a18;">Additional Details</a></div>`
