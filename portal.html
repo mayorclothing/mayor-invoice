@@ -695,12 +695,27 @@ async function showOrder(idx) {
   // order-detail fetch (2 Google Sheets API reads) above. This is the actual
   // background for any order using the local-file fallback (the common case
   // per Matt/Marcus), so it's usually already correct; the fetch above may
-  // still overwrite it with a sheet-provided Shopify CDN URL once known. A
-  // missing swatch just 404s silently -- no visible effect.
-  document.body.style.backgroundImage = `url('/swatches/${encodeURIComponent(o.order_number)}')`;
+  // still overwrite it with a sheet-provided Shopify CDN URL once known.
+  const optimisticBgUrl = `/swatches/${encodeURIComponent(o.order_number)}`;
+  document.body.style.backgroundImage = `url('${optimisticBgUrl}')`;
   document.body.style.backgroundSize = 'cover';
   document.body.style.backgroundRepeat = 'no-repeat';
   document.body.style.backgroundPosition = 'center';
+
+  // A missing swatch 404s -- an inline style wins over the .detail-bg CSS
+  // class's default black pattern even when its image fails to load, so
+  // without this the page just went blank instead of falling back to it.
+  // Clear the inline style on failure so that default shows through again.
+  const optimisticProbe = new Image();
+  optimisticProbe.onerror = () => {
+    if (currentOrder !== o) return;
+    if (document.body.style.backgroundImage !== `url("${optimisticBgUrl}")`) return; // superseded already
+    document.body.style.backgroundImage = '';
+    document.body.style.backgroundSize = '';
+    document.body.style.backgroundRepeat = '';
+    document.body.style.backgroundPosition = '';
+  };
+  optimisticProbe.src = optimisticBgUrl;
 
   const badge = document.getElementById('detail-status-badge');
   badge.textContent = displayStatus(o.status);
