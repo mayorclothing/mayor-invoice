@@ -858,8 +858,15 @@ async function showOrder(idx) {
     </div>`;
 
     (d.line_items || []).forEach(item => {
-      const sizes = parseSizes(item.description || '');
-      const desc  = stripSizes(item.description || '');
+      // The sheet has a dedicated Sizes column per item (parseSheetRow already
+      // reads it into item.sizes) -- prefer that clean value over re-deriving
+      // sizes from the description text. Only fall back to parsing the
+      // description when Sizes is blank (older rows that predate the sheet
+      // reorg's sizes/description split), since that's the only place those
+      // rows have it.
+      const rawSizes = (item.sizes || '').trim();
+      const sizes = rawSizes ? parseSizes(rawSizes) : parseSizes(item.description || '');
+      const desc  = rawSizes ? (item.description || '') : stripSizes(item.description || '');
       const priceHTML = item.orig_price && Number(item.orig_price) > 0
         ? `<span style="text-decoration:line-through; color:#aaa; display:block; font-size:12px;">${fmtMoney(item.orig_price)}</span><span>${fmtMoney(item.price)}</span>`
         : fmtMoney(item.price);
