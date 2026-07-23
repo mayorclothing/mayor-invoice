@@ -57,6 +57,10 @@ const LOGO_PATH = __dirname + '/Mayor_Logo_transparent.png';
 
 // ---- /generate hardening (this endpoint is browser-reachable and writes to the sheet) ----
 function sheetSafe(v) { if (typeof v !== 'string') return v; return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v; }
+// Status is monotonic — never regress an order (paid/shipped/delivered) back to
+// Awaiting Payment when its invoice is regenerated. Mirrors googleStore.js.
+const STATUS_RANK = { 'awaiting approval': 1, 'awaiting payment': 2, 'pending': 3, 'paid': 3, 'in transit': 4, 'shipped': 4, 'delivered': 5 };
+const statusRank = (s) => STATUS_RANK[String(s || '').trim().toLowerCase()] || 0;
 // See matching comment in portal.js — order numbers are the lookup key for every
 // sheet write below; normalize so a stray space can't create a duplicate row.
 function normalizeOrderNumber(v) { return String(v || '').trim().replace(/\s+/g, ' '); }
@@ -70,6 +74,19 @@ function trustedPaymentLink(u) {
   } catch (e) { return ''; }
 }
 function httpsUrlOrEmpty(u) { try { const url = new URL(String(u)); return url.protocol === 'https:' ? url.toString() : ''; } catch (e) { return ''; } }
+// /generate renders a PDF (public — the portal and browser generator both call it)
+// but must NOT let an anonymous caller WRITE to the sheet. Gate the logging path
+// behind INTERNAL_API_KEY (timing-safe). Fail closed: no key configured => no
+// anonymous writes. The portal never trips this (it sends skip_logging).
+const crypto = require('crypto');
+function writeAuthorized(req) {
+  const expected = process.env.INTERNAL_API_KEY || '';
+  if (!expected) return false;
+  const hdr = req.header('Authorization') || '';
+  const tok = hdr.startsWith('Bearer ') ? hdr.slice(7) : '';
+  const a = Buffer.from(tok), b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 function sanitizeGeneratePayload(data) {
   const d = { ...(data || {}) };
   d.payment_link = trustedPaymentLink(d.payment_link);
@@ -202,16 +219,16 @@ async function appendOrderToSheet(data) {
       await writeToSheet('Invoices', data.order_number, rowData);
 
       // Update Order Info status to Awaiting Payment
-      const orderRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:A' });
+      const orderRows = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'Order Info!A:E' });
       const orderData = orderRows.data.values || [];
       const orderIdx = orderData.findIndex((r, i) => i > 0 && normalizeOrderNumber(r[0]) === normalizeOrderNumber(data.order_number));
-      if (orderIdx > 0) {
+      if (orderIdx > 0 && statusRank('Awaiting Payment') > statusRank(orderData[orderIdx][4])) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: SHEET_ID, range: `Order Info!E${orderIdx + 1}`,
           valueInputOption: 'USER_ENTERED', resource: { values: [['Awaiting Payment']] }
         });
+        console.log('Invoice logged, status updated to Awaiting Payment:', data.order_number);
       }
-      console.log('Invoice logged, status updated to Awaiting Payment:', data.order_number);
     }
   } catch(e) {
     console.error('Sheet write failed:', e.message);
@@ -227,8 +244,13 @@ app.post('/generate', async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="mayor-invoice.pdf"');
     res.send(pdf);
 
-    // Log order to Google Sheet (non-blocking) — setup email sent manually
-    if (!data.skip_logging) appendOrderToSheet(data);
+    // Log order to Google Sheet (non-blocking) — only for authenticated callers.
+    // The portal sends skip_logging (render-only); the browser generator must
+    // present INTERNAL_API_KEY. Anonymous writes are dropped (F4).
+    if (!data.skip_logging) {
+      if (writeAuthorized(req)) appendOrderToSheet(data);
+      else console.warn('Blocked unauthenticated /generate sheet write for order:', data.order_number);
+    }
 
   } catch(e) {
     console.error(e);
